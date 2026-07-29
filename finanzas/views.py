@@ -124,4 +124,71 @@ class InyeccionDetalleView(APIView):
             return Response({"error": "Inyeccion no eliminada"}, status = 404)
 
         return Response({"mensaje": "Inyeccion eliminada"})
-        
+
+class GastosView(APIView):
+    def get(self, request, negocio_id):
+
+        query = "SELECT * FROM gasto WHERE negocio_id = %s"
+        parametros = [negocio_id]
+
+        registros = fetch_all(query, parametros)
+
+        return Response(registros)
+
+    def post(self, request, negocio_id):
+
+        categoria_id = request.data.get("categoria_id")
+        monto = request.data.get("monto")
+        fecha = request.data.get("fecha")
+        descripcion = request.data.get("descripcion")
+
+        query = "INSERT INTO gasto (negocio_id, categoria_id, monto, fecha, descripcion) VALUES (%s, %s, %s, %s, %s)"
+        parametros = [negocio_id, categoria_id, monto, fecha, descripcion]
+
+        filas_afectadas = execute_command(query, parametros)
+
+        if filas_afectadas == 0:
+            return Response({"error": "No se realizo el registro del gasto"}, status = 400)
+
+        return Response({"mensaje": "Gasto registrado"})
+
+class GastoDetalleView(APIView):
+    def get(self, request, negocio_id, gasto_id):
+
+        query = "SELECT * FROM gasto WHERE id = %s AND negocio_id = %s"
+        parametros = [gasto_id, negocio_id]
+
+        registro = fetch_one(query, parametros)
+
+        if registro is None:
+            return Response({"error": "Gasto no encontrado"}, status = 404)
+
+        return Response(registro)
+
+    def put(self, request, negocio_id, gasto_id):
+
+        categoria_id = request.data.get("categoria_id")
+        monto = request.data.get("monto")
+        fecha = request.data.get("fecha")
+        descripcion = request.data.get("descripcion")
+
+        query = "UPDATE gasto SET categoria_id = %s, monto = %s, fecha = %s, descripcion = %s WHERE id = %s AND negocio_id = %s"
+        parametros = [categoria_id, monto, fecha, descripcion, gasto_id, negocio_id]
+
+        resultados = execute_command(query, parametros)
+
+        if resultados == 0:
+            return Response({"error": "Gasto no actualizado"}, status = 404)
+
+        return Response({"mensaje": "Gasto actualizado"})
+
+    def delete(self, request, negocio_id, gasto_id):
+            query = "DELETE FROM gasto WHERE id = %s AND negocio_id = %s"
+            parametros = [gasto_id, negocio_id]
+
+            filas_afectadas = execute_command(query, parametros)
+
+            if filas_afectadas == 0:
+                return Response({"error": "Gasto no eliminado"}, status = 404)
+
+            return Response({"mensaje": "Gasto eliminado"})

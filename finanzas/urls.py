@@ -7,4 +7,6 @@ urlpatterns = [
     path("categorias/<int:categoria_id>/", views.CategoriaDetalleView.as_view(), name="categoria_detalle"),
     path("inyecciones/", views.InyeccionesView.as_view(), name="inyecciones"),
     path("inyecciones/<int:inyeccion_id>/", views.InyeccionDetalleView.as_view(), name="inyeccion_detalle"),
+    path("gastos/", views.GastosView.as_view(), name="gastos"),
+    path("gastos/<int:gasto_id>/", views.GastoDetalleView.as_view(), name="gasto_detalle"),
 ]
