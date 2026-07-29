@@ -29,9 +29,8 @@ class NegocioDetalleView(APIView):
         query = "UPDATE negocio SET nombre = %s WHERE id = %s"
         parametros = [nombre, negocio_id]
 
-        execute_command(query, parametros)
+        filas_afectadas = execute_command(query, parametros)
 
-        filas_afectadas = execute_command.rowcount
         if filas_afectadas == 0:
             return Response({"error": "Negocio no encontrado"}, status=404)
         return Response({"mensaje": "Negocio actualizado"})
@@ -41,9 +40,8 @@ class NegocioDetalleView(APIView):
         query = "DELETE FROM negocio WHERE id = %s"
         parametros = [negocio_id]
 
-        execute_command(query, parametros)
-        
-        filas_afectadas = execute_command.rowcount
+        filas_afectadas = execute_command(query, parametros)
+
         if filas_afectadas == 0:
             return Response({"error": "Negocio no encontrado"}, status=404)
-        return Response({"mensaje": "Negocio eliminad"})
+        return Response({"mensaje": "Negocio eliminado"})

@@ -51,8 +51,8 @@ def execute_command(sql, params=None):
 
     try:
 
-        filas = cursor.execute(sql, params)
-        filas_afectadas = cursor.rowcount(sql, params)
+        cursor.execute(sql, params)
+        filas_afectadas = cursor.rowcount
         return filas_afectadas
     
     finally:

@@ -18,7 +18,12 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.staticfiles'
+    'django.contrib.staticfiles',
+    'rest_framework',
+    'core',
+    'negocios', 
+    'finanzas',
+
 ]
 
 MIDDLEWARE = [
