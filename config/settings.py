@@ -18,12 +18,14 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'django.contrib.contenttypes',
+    'django.contrib.auth',
     'django.contrib.staticfiles',
     'rest_framework',
     'core',
-    'negocios', 
+    'negocios',
     'finanzas',
-
+    'ventas',
 ]
 
 MIDDLEWARE = [
@@ -61,8 +63,20 @@ DATABASES = {
         'OPTIONS': {
             'driver': os.environ.get('DB_DRIVER'),
             'Trusted_Connection': os.environ.get('DB_TRUSTED_CONNECTION'),
+            'extra_params': 'TrustServerCertificate=yes',
         },
     }
+}
+
+REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
 }
 
 LANGUAGE_CODE = 'en-us'
@@ -78,3 +92,5 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
