@@ -59,3 +59,17 @@ def execute_command(sql, params=None):
 
         if cursor:
             cursor.close()
+
+def execute_insert(sql, params=None):
+    if params is None:
+        params = []
+    cursor = connection.cursor()
+    try:
+        cursor.execute(sql, params)
+        fila = cursor.fetchone()
+        if fila is None:
+            return None
+        return fila[0]
+    finally: 
+        if cursor:
+            cursor.close()
