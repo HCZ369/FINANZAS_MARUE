@@ -1,6 +1,6 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from core.db import fetch_all, fetch_one, execute_command
+from core.db import fetch_all, fetch_one, execute_command, execute_insert
 
 class ClientesView(APIView):
     def get(self, request, negocio_id):
@@ -126,3 +126,45 @@ class ProductoDetalleView(APIView):
             return Response({"error": "Producto no eliminado"}, status=404)
 
         return Response({"mensaje": "Producto eliminado"})
+
+class VentasView(APIView):
+    def get(self, request, negocio_id):
+        query = "SELECT * FROM venta WHERE negocio_id = %s"
+        parametros = [negocio_id]
+        registros = fetch_all(query, parametros)
+        return Response(registros)
+    
+    def post(self, request, negocio_id):
+
+        cliente_id = request.data.get("cliente_id")
+        fecha = request.data.get("fecha")
+        productos = request.data.get("productos")
+        monto_total = 0
+
+        query = "INSERT INTO venta (negocio_id, cliente_id, fecha, monto_total) OUTPUT INSERTED.id VALUES (%s, %s, %s, %s)"
+        parametros = [negocio_id, cliente_id, fecha, monto_total]
+
+        venta_id = execute_insert(query, parametros)
+
+        monto_acumulado = 0
+
+        for producto_item in productos:
+            producto_id = producto_item.get("producto_id")
+            cantidad = producto_item.get("cantidad")
+            query = "SELECT precio FROM producto WHERE id = %s"
+            parametros = [producto_id]
+            precio_producto = fetch_one(query, parametros)
+            subtotal = precio_producto["precio"] * cantidad
+
+            query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s)"
+            parametros_detalle = [venta_id, producto_id, cantidad, precio_producto["precio"], subtotal]
+            execute_command(query_detalle, parametros_detalle)
+
+            monto_acumulado += subtotal
+
+        query_update = "UPDATE venta SET monto_total = %s WHERE id = %s"
+        parametro_update = [monto_acumulado, venta_id]
+
+        execute_command(query_update, parametro_update)
+
+        return Response({"mensaje": "Venta creada", "venta_id": venta_id, "monto_total": monto_acumulado})
