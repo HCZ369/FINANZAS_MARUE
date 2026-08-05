@@ -168,3 +168,22 @@ class VentasView(APIView):
         execute_command(query_update, parametro_update)
 
         return Response({"mensaje": "Venta creada", "venta_id": venta_id, "monto_total": monto_acumulado})
+
+class VentaDetalleView(APIView):
+    def get(self, request, negocio_id, venta_id):
+        query = "SELECT * FROM venta WHERE id = %s AND negocio_id = %s"
+        parametros = [venta_id, negocio_id]
+
+        venta = fetch_one(query, parametros)
+
+        if venta is None:
+            return Response({"error": "Venta no encontrada"}, status = 404)
+        
+        query_detalle = "SELECT * FROM venta_detalle WHERE venta_id = %s"
+
+        parametros_detalle = [venta_id]
+        detalles = fetch_all(query_detalle, parametros_detalle)
+
+        venta["productos"] = detalles
+
+        return Response(venta)
