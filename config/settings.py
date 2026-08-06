@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'negocios',
     'finanzas',
     'ventas',
+    'dashboard'
 ]
 
 MIDDLEWARE = [
@@ -63,7 +64,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': os.environ.get('DB_DRIVER'),
             'Trusted_Connection': os.environ.get('DB_TRUSTED_CONNECTION'),
-            'extra_params': 'TrustServerCertificate=yes',
+            'extra_params': 'Encrypt=yes;TrustServerCertificate=no',
         },
     }
 }
@@ -78,6 +79,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.AllowAny",
     ],
 }
+
 
 LANGUAGE_CODE = 'en-us'
 

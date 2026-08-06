@@ -187,3 +187,51 @@ class VentaDetalleView(APIView):
         venta["productos"] = detalles
 
         return Response(venta)
+    def put(self, request, negocio_id, venta_id):
+        cliente_id = request.data.get("cliente_id")
+        fecha = request.data.get("fecha")
+        productos = request.data.get("productos")
+
+        query_venta = "UPDATE venta SET cliente_id = %s, fecha = %s WHERE id = %s AND negocio_id = %s"
+        parametros_venta = [cliente_id, fecha, venta_id, negocio_id]
+        execute_command(query_venta, parametros_venta)
+
+        query_borrar = "DELETE FROM venta_detalle WHERE venta_id = %s"
+        parametros_borrar = [venta_id]
+        execute_command(query_borrar, parametros_borrar)
+
+        monto_acumulado = 0
+
+        for producto_item in productos:
+            producto_id = producto_item.get("producto_id")
+            cantidad = producto_item.get("cantidad")
+
+            query_precio = "SELECT precio FROM producto WHERE id = %s"
+            parametros_precio = [producto_id]
+            precio_producto = fetch_one(query_precio, parametros_precio)
+            subtotal = precio_producto["precio"] * cantidad
+
+            query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s)"
+            parametros_detalle = [venta_id, producto_id, cantidad, precio_producto["precio"], subtotal]
+            execute_command(query_detalle, parametros_detalle)
+
+            monto_acumulado += subtotal
+
+        query_total = "UPDATE venta SET monto_total = %s WHERE id = %s"
+        parametros_total = [monto_acumulado, venta_id]
+        execute_command(query_total, parametros_total)
+
+        return Response({"mensaje": "Venta actualizada", "monto_total": monto_acumulado})
+
+    def delete(self, request, negocio_id, venta_id):
+        query_borrar_detalle = "DELETE FROM venta_detalle WHERE venta_id = %s"
+        execute_command(query_borrar_detalle, [venta_id])
+
+        query_borrar_venta = "DELETE FROM venta WHERE id = %s AND negocio_id = %s"
+        parametros = [venta_id, negocio_id]
+        filas_afectadas = execute_command(query_borrar_venta, parametros)
+
+        if filas_afectadas == 0:
+            return Response({"error": "Venta no encontrada"}, status=404)
+
+        return Response({"mensaje": "Venta eliminada"})
