@@ -14,3 +14,19 @@ class GastosPorCategoriaView(APIView):
         parametros = [negocio_id]
         resultados = fetch_all(query, parametros)
         return Response(resultados)
+
+class EvolucionMensualView(APIView):
+    def get(self, request, negocio_id):
+        query = """
+            SELECT YEAR(fecha) as anio,
+                   MONTH(fecha) as mes,
+                   SUM(monto) as total
+              FROM gasto
+             WHERE negocio_id = %s
+             GROUP BY YEAR(fecha), MONTH(fecha) 
+             ORDER BY YEAR(fecha), MONTH(fecha)
+        """
+        parametros = [negocio_id]
+        resultados = fetch_all(query, fetch_all)
+
+        return Response(resultados)

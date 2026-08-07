@@ -35,6 +35,15 @@ const datosSimulados = {
     { id: 1, nombre: "Collar gótico", precio: 45000 },
     { id: 2, nombre: "Pulsera cadena", precio: 30000 },
   ],
+  "/negocios/1/dashboard/evolucion-mensual/": [
+  { anio: 2026, mes: 1, total: 45000 },
+  { anio: 2026, mes: 2, total: 62000 },
+  { anio: 2026, mes: 3, total: 38000 },
+  { anio: 2026, mes: 4, total: 71000 },
+  { anio: 2026, mes: 5, total: 55000 },
+  { anio: 2026, mes: 6, total: 48000 },
+  { anio: 2026, mes: 7, total: 83000 },
+],
 }
 
 export async function apiGet(ruta) {
