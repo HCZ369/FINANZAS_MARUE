@@ -6,3 +6,4 @@ pyodbc==5.2.0
 pytz==2026.3.post1
 sqlparse==0.5.5
 tzdata==2026.3
+django-cors-headers==4.4.0
