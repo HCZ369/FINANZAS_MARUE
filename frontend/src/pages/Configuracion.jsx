@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react"
 import { apiGet, apiPost, apiPut, apiDelete } from "../api/client"
-import FormularioProducto from "../components/FormularioProducto"
 
 function Configuracion({ negocioId }) {
   const [negocios, setNegocios] = useState([])
@@ -26,6 +25,11 @@ function Configuracion({ negocioId }) {
 
   const [mensaje, setMensaje] = useState("")
 
+  const [productos, setProductos] = useState([])
+  const [nombreProducto, setNombreProducto] = useState("")
+  const [precioProducto, setPrecioProducto] = useState("")
+  const [editandoProductoId, setEditandoProductoId] = useState(null)
+
   useEffect(() => {
     cargarDatos()
   }, [negocioId])
@@ -35,6 +39,7 @@ function Configuracion({ negocioId }) {
     setCategorias(await apiGet(`/negocios/${negocioId}/categorias/`))
     setClientes(await apiGet(`/negocios/${negocioId}/clientes/`))
     setInyecciones(await apiGet(`/negocios/${negocioId}/inyecciones/`))
+    setProductos(await apiGet(`/negocios/${negocioId}/productos/`))
   }
 
   // --- Negocio ---
@@ -132,6 +137,30 @@ function Configuracion({ negocioId }) {
     await cargarDatos()
   }
 
+  // --- Producto ---
+  async function guardarProducto(evento) {
+    evento.preventDefault()
+    const datos = { nombre: nombreProducto, precio: precioProducto }
+    const resultado = editandoProductoId
+      ? await apiPut(`/negocios/${negocioId}/productos/${editandoProductoId}/`, datos)
+      : await apiPost(`/negocios/${negocioId}/productos/`, datos)
+    setMensaje(resultado.mensaje)
+    setNombreProducto("")
+    setPrecioProducto("")
+    setEditandoProductoId(null)
+    await cargarDatos()
+  }
+  function editarProducto(p) {
+    setEditandoProductoId(p.id)
+    setNombreProducto(p.nombre)
+    setPrecioProducto(p.precio)
+  }
+  async function borrarProducto(id) {
+    const resultado = await apiDelete(`/negocios/${negocioId}/productos/${id}/`)
+    setMensaje(resultado.mensaje)
+    await cargarDatos()
+  }
+
   return (
     <div>
       <h1>Configuración</h1>
@@ -143,15 +172,17 @@ function Configuracion({ negocioId }) {
           <input type="text" placeholder="Nombre" value={nombreNegocio} onChange={(e) => setNombreNegocio(e.target.value)} />
           <button type="submit">{editandoNegocioId ? "Guardar" : "Crear negocio"}</button>
         </form>
-        <ul>
+        <div className="lista-items">
           {negocios.map((n) => (
-            <li key={n.id}>
-              {n.nombre}
-              <button onClick={() => editarNegocio(n)}>Editar</button>
-              <button onClick={() => borrarNegocio(n.id)}>Borrar</button>
-            </li>
+            <div className="fila-item" key={n.id}>
+              <span>{n.nombre}</span>
+              <div className="acciones">
+                <button onClick={() => editarNegocio(n)}>Editar</button>
+                <button className="btn-borrar" onClick={() => borrarNegocio(n.id)}>Borrar</button>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
 
       <section>
@@ -164,15 +195,17 @@ function Configuracion({ negocioId }) {
           </select>
           <button type="submit">{editandoCategoriaId ? "Guardar" : "Crear categoría"}</button>
         </form>
-        <ul>
+        <div className="lista-items">
           {categorias.map((c) => (
-            <li key={c.id}>
-              {c.nombre} ({c.tipo})
-              <button onClick={() => editarCategoria(c)}>Editar</button>
-              <button onClick={() => borrarCategoria(c.id)}>Borrar</button>
-            </li>
+            <div className="fila-item" key={c.id}>
+              <span>{c.nombre} ({c.tipo})</span>
+              <div className="acciones">
+                <button onClick={() => editarCategoria(c)}>Editar</button>
+                <button className="btn-borrar" onClick={() => borrarCategoria(c.id)}>Borrar</button>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
 
       <section>
@@ -182,15 +215,17 @@ function Configuracion({ negocioId }) {
           <input type="email" placeholder="Correo" value={correoCliente} onChange={(e) => setCorreoCliente(e.target.value)} />
           <button type="submit">{editandoClienteId ? "Guardar" : "Crear cliente"}</button>
         </form>
-        <ul>
+        <div className="lista-items">
           {clientes.map((c) => (
-            <li key={c.id}>
-              {c.nombre} — {c.correo}
-              <button onClick={() => editarCliente(c)}>Editar</button>
-              <button onClick={() => borrarCliente(c.id)}>Borrar</button>
-            </li>
+            <div className="fila-item" key={c.id}>
+              <span>{c.nombre} — {c.correo}</span>
+              <div className="acciones">
+                <button onClick={() => editarCliente(c)}>Editar</button>
+                <button className="btn-borrar" onClick={() => borrarCliente(c.id)}>Borrar</button>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
 
       <section>
@@ -201,20 +236,37 @@ function Configuracion({ negocioId }) {
           <input type="text" placeholder="Nota" value={notaInyeccion} onChange={(e) => setNotaInyeccion(e.target.value)} />
           <button type="submit">{editandoInyeccionId ? "Guardar" : "Registrar inyección"}</button>
         </form>
-        <ul>
+        <div className="lista-items">
           {inyecciones.map((i) => (
-            <li key={i.id}>
-              {i.fecha} — {i.monto} ({i.nota})
-              <button onClick={() => editarInyeccion(i)}>Editar</button>
-              <button onClick={() => borrarInyeccion(i.id)}>Borrar</button>
-            </li>
+            <div className="fila-item" key={i.id}>
+              <span>{i.fecha} — {i.monto} ({i.nota})</span>
+              <div className="acciones">
+                <button onClick={() => editarInyeccion(i)}>Editar</button>
+                <button className="btn-borrar" onClick={() => borrarInyeccion(i.id)}>Borrar</button>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
 
       <section>
-        <h2>Nuevo producto</h2>
-        <FormularioProducto negocioId={negocioId} />
+        <h2>Productos</h2>
+        <form onSubmit={guardarProducto}>
+          <input type="text" placeholder="Nombre" value={nombreProducto} onChange={(e) => setNombreProducto(e.target.value)} />
+          <input type="number" placeholder="Precio" value={precioProducto} onChange={(e) => setPrecioProducto(e.target.value)} />
+          <button type="submit">{editandoProductoId ? "Guardar" : "Crear producto"}</button>
+        </form>
+        <div className="lista-items">
+          {productos.map((p) => (
+            <div className="fila-item" key={p.id}>
+              <span>{p.nombre} — {p.precio}</span>
+              <div className="acciones">
+                <button onClick={() => editarProducto(p)}>Editar</button>
+                <button className="btn-borrar" onClick={() => borrarProducto(p.id)}>Borrar</button>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   )

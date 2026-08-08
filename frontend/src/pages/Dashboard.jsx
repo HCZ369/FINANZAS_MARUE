@@ -1,20 +1,29 @@
 import TarjetasResumen from "../components/TarjetasResumen"
 import GraficoGastos from "../components/GraficoGastos"
 import GraficoEvolucion from "../components/GraficoEvolucion"
+import TablaTopProductos from "../components/TablaTopProductos"
 
 function Dashboard({ negocioId }) {
   return (
     <div>
       <h1>Dashboard</h1>
       <TarjetasResumen negocioId={negocioId} />
-      <h2>Gastos por categoría</h2>
-      <div style={{ maxWidth: "600px", height: "300px" }}>
-        <GraficoGastos negocioId={negocioId} />
+
+      <div className="grid-dashboard">
+        <section>
+          <h2>Gastos por categoría</h2>
+          <GraficoGastos negocioId={negocioId} />
+        </section>
+        <section>
+          <h2>Evolución mensual de gastos</h2>
+          <GraficoEvolucion negocioId={negocioId} />
+        </section>
       </div>
-      <h2>Evolución mensual de gastos</h2>
-      <div style={{ maxWidth: "600px", height: "300px" }}>
-        <GraficoEvolucion negocioId={negocioId} />
-      </div>
+
+      <section>
+        <h2>Productos más vendidos</h2>
+        <TablaTopProductos negocioId={negocioId} />
+      </section>
     </div>
   )
 }

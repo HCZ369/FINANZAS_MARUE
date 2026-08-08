@@ -188,3 +188,80 @@ button:hover {
 .tarjeta { background: #1e1e2e; border-radius: 8px; padding: 16px 20px; flex: 1; }
 .tarjeta span { display: block; color: #9999aa; font-size: 13px; }
 .tarjeta strong { font-size: 24px; }
+
+.tarjetas-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.tarjeta {
+  background: linear-gradient(160deg, #1e2028, #161920);
+  border: 1px solid #2d3139;
+  border-radius: 10px;
+  padding: 1.1rem 1.3rem;
+}
+
+.tarjeta span {
+  display: block;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+
+.tarjeta strong {
+  font-size: 1.7rem;
+  color: #f9fafb;
+}
+
+.positivo { color: #34d399; }
+.negativo { color: #f87171; }
+
+.grid-dashboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .grid-dashboard { grid-template-columns: 1fr; }
+}
+
+.lista-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.fila-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+  background-color: #1a1d24;
+  border-radius: 6px;
+  border: 1px solid #2d3139;
+}
+
+.fila-item .acciones {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.fila-item button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.btn-borrar {
+  background-color: #dc2626;
+}
+
+.btn-borrar:hover {
+  background-color: #b91c1c;
+}
