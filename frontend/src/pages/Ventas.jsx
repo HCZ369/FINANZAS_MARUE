@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { apiGet, apiPost } from "../api/client"
+import { apiGet, apiPost, apiDelete } from "../api/client"
 
 function Ventas({ negocioId }) {
   const [ventas, setVentas] = useState([])
@@ -11,16 +11,22 @@ function Ventas({ negocioId }) {
   const [mensaje, setMensaje] = useState("")
 
   useEffect(() => {
-    async function cargarDatos() {
-      const ventasData = await apiGet(`/negocios/${negocioId}/ventas/`)
-      const clientesData = await apiGet(`/negocios/${negocioId}/clientes/`)
-      const productosData = await apiGet(`/negocios/${negocioId}/productos/`)
-      setVentas(ventasData)
-      setClientes(clientesData)
-      setProductos(productosData)
-    }
     cargarDatos()
   }, [negocioId])
+
+  async function cargarDatos() {
+    const ventasData = await apiGet(`/negocios/${negocioId}/ventas/`)
+    const clientesData = await apiGet(`/negocios/${negocioId}/clientes/`)
+    const productosData = await apiGet(`/negocios/${negocioId}/productos/`)
+    setVentas(ventasData)
+    setClientes(clientesData)
+    setProductos(productosData)
+  }
+
+  function nombreCliente(clienteId) {
+    const cliente = clientes.find((c) => c.id === clienteId)
+    return cliente ? cliente.nombre : clienteId
+  }
 
   function agregarAlCarrito() {
     setCarrito([...carrito, { producto_id: "", cantidad: 1 }])
@@ -55,9 +61,13 @@ function Ventas({ negocioId }) {
     setClienteId("")
     setFecha("")
     setCarrito([])
+    await cargarDatos()
+  }
 
-    const ventasActualizadas = await apiGet(`/negocios/${negocioId}/ventas/`)
-    setVentas(ventasActualizadas)
+  async function borrarVenta(ventaId) {
+    const resultado = await apiDelete(`/negocios/${negocioId}/ventas/${ventaId}/`)
+    setMensaje(resultado.mensaje)
+    await cargarDatos()
   }
 
   return (
@@ -113,14 +123,16 @@ function Ventas({ negocioId }) {
             <th>Fecha</th>
             <th>Cliente</th>
             <th>Total</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {ventas.map((v) => (
             <tr key={v.id}>
               <td>{v.fecha}</td>
-              <td>{v.cliente_id}</td>
+              <td>{nombreCliente(v.cliente_id)}</td>
               <td>{v.monto_total}</td>
+              <td><button onClick={() => borrarVenta(v.id)}>Borrar</button></td>
             </tr>
           ))}
         </tbody>

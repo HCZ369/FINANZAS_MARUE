@@ -27,6 +27,19 @@ class EvolucionMensualView(APIView):
              ORDER BY YEAR(fecha), MONTH(fecha)
         """
         parametros = [negocio_id]
-        resultados = fetch_all(query, fetch_all)
+        resultados = fetch_all(query, parametros)
 
         return Response(resultados)
+
+class TotalesView(APIView):
+    def get(self, request, negocio_id):
+        query = """
+            SELECT
+                (SELECT ISNULL(SUM(monto), 0) FROM inyeccion_capital WHERE negocio_id = %s) AS inyecciones,
+                (SELECT ISNULL(SUM(monto_total), 0) FROM venta WHERE negocio_id = %s) AS ventas,
+                (SELECT ISNULL(SUM(monto), 0) FROM gasto WHERE negocio_id = %s) AS gastos
+        """
+        parametros = [negocio_id, negocio_id, negocio_id]
+        resultado = fetch_one(query, parametros)
+        resultado["saldo"] = resultado["inyecciones"] + resultado["ventas"] - resultado["gastos"]
+        return Response(resultado)
