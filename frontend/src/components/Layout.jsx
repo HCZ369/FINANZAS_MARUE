@@ -1,6 +1,14 @@
 import { NavLink, Outlet } from "react-router-dom"
 
 function Layout({ negocioId, negocios, onCambioNegocio }) {
+  const enlaces = [
+    { ruta: "/", texto: "Dashboard", exacto: true },
+    { ruta: "/ventas", texto: "Ventas" },
+    { ruta: "/clientes", texto: "Clientes" },
+    { ruta: "/gastos", texto: "Gastos" },
+    { ruta: "/configuracion", texto: "Configuración" },
+  ]
+
   return (
     <div className="layout">
       <aside className="sidebar">
@@ -12,6 +20,7 @@ function Layout({ negocioId, negocios, onCambioNegocio }) {
             value={negocioId || ""}
             onChange={(e) => onCambioNegocio(Number(e.target.value))}
           >
+            {negocios.length === 0 && <option value="">Sin negocios</option>}
             {negocios.map((n) => (
               <option key={n.id} value={n.id}>{n.nombre}</option>
             ))}
@@ -19,19 +28,16 @@ function Layout({ negocioId, negocios, onCambioNegocio }) {
         </div>
 
         <nav>
-          <NavLink to="/" className={({ isActive }) => isActive ? "nav-link activo" : "nav-link"}>
-            Dashboard
-          </NavLink>
-          <NavLink to="/gastos" className={({ isActive }) => isActive ? "nav-link activo" : "nav-link"}>
-            Gastos
-          </NavLink>
-          <NavLink to="/ventas" className={({ isActive }) => isActive ? "nav-link activo" : "nav-link"}>
-            Ventas
-          </NavLink>
-          <NavLink to="/configuracion" className={({ isActive }) => isActive ? "nav-link activo" : "nav-link"}>
-            Configuración
-          </NavLink>
-          <Link to="/clientes">Clientes</Link>
+          {enlaces.map((enlace) => (
+            <NavLink
+              key={enlace.ruta}
+              to={enlace.ruta}
+              end={enlace.exacto === true}
+              className={({ isActive }) => isActive ? "nav-link activo" : "nav-link"}
+            >
+              {enlace.texto}
+            </NavLink>
+          ))}
         </nav>
       </aside>
 
