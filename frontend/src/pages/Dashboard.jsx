@@ -2,6 +2,7 @@ import TarjetasResumen from "../components/TarjetasResumen"
 import GraficoGastos from "../components/GraficoGastos"
 import GraficoEvolucion from "../components/GraficoEvolucion"
 import TablaTopProductos from "../components/TablaTopProductos"
+import GraficoProyeccion from "../components/GraficoProyeccion"
 
 function Dashboard({ negocioId }) {
   return (
@@ -19,11 +20,16 @@ function Dashboard({ negocioId }) {
           <GraficoEvolucion negocioId={negocioId} />
         </section>
       </div>
+      <section>
+        <h2>Proyección vs Realidad</h2>
+        <GraficoProyeccion negocioId={negocioId} />
+      </section>
 
       <section>
         <h2>Productos más vendidos</h2>
         <TablaTopProductos negocioId={negocioId} />
       </section>
+
     </div>
   )
 }

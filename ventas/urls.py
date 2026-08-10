@@ -9,4 +9,8 @@ urlpatterns = [
     path("productos/<int:producto_id>/", views.ProductoDetalleView.as_view(), name="producto_detalle"),
     path("ventas/", views.VentasView.as_view(), name="ventas"),
     path("ventas/<int:venta_id>/", views.VentaDetalleView.as_view(), name="venta_detalle"),
+    path("<int:negocio_id>/lotes/", views.LotesView.as_view(), name="lotes"),
+    path("<int:negocio_id>/lotes/<int:lote_id>/", views.LoteDetalleView.as_view(), name="lote_detalle"),
+    path("<int:negocio_id>/sugerencia-precio/", views.SugerenciaPrecioView.as_view(), name="sugerencia_precio"),
+    path("<int:negocio_id>/clientes/<int:cliente_id>/ventas/", views.VentasPorClienteView.as_view(), name="ventas_por_cliente"),
 ]

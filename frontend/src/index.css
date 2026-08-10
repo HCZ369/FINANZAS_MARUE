@@ -265,3 +265,22 @@ button:hover {
 .btn-borrar:hover {
   background-color: #b91c1c;
 }
+
+.grid-clientes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .grid-clientes { grid-template-columns: 1fr; }
+}
+
+.caja-sugerencia {
+  background-color: #1a1d24;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  margin: 0.5rem 0;
+}
+.caja-sugerencia p { margin: 0.2rem 0; font-size: 0.9rem; }

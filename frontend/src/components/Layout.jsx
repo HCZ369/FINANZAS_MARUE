@@ -31,6 +31,7 @@ function Layout({ negocioId, negocios, onCambioNegocio }) {
           <NavLink to="/configuracion" className={({ isActive }) => isActive ? "nav-link activo" : "nav-link"}>
             Configuración
           </NavLink>
+          <Link to="/clientes">Clientes</Link>
         </nav>
       </aside>
 

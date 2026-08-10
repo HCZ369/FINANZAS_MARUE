@@ -68,7 +68,7 @@ class ClienteDetalleView(APIView):
 
 class ProductosView(APIView):
     def get(self, request, negocio_id):
-        query = "SELECT * FROM producto WHERE negocio_id = %s"
+        query = "SELECT id, negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada FROM producto WHERE negocio_id = %s"
         parametros = [negocio_id]
 
         registros = fetch_all(query, parametros)
@@ -78,9 +78,13 @@ class ProductosView(APIView):
     def post(self, request, negocio_id):
         nombre = request.data.get("nombre")
         precio = request.data.get("precio")
+        costo = request.data.get("costo")
+        lote_id = request.data.get("lote_id")
+        costo_usd = request.data.get("costo_usd")
+        cantidad_comprada = request.data.get("cantidad_comprada")
 
-        query = "INSERT INTO producto (negocio_id, nombre, precio) VALUES (%s, %s, %s)"
-        parametros = [negocio_id, nombre, precio]
+        query = "INSERT INTO producto (negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        parametros = [negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada]
 
         filas_afectadas = execute_command(query, parametros)
 
@@ -88,7 +92,6 @@ class ProductosView(APIView):
             return Response({"error": "No se registro el producto"}, status=400)
 
         return Response({"mensaje": "Producto creado"})
-
 
 class ProductoDetalleView(APIView):
     def get(self, request, negocio_id, producto_id):
@@ -105,9 +108,13 @@ class ProductoDetalleView(APIView):
     def put(self, request, negocio_id, producto_id):
         nombre = request.data.get("nombre")
         precio = request.data.get("precio")
+        costo = request.data.get("costo")
+        lote_id = request.data.get("lote_id")
+        costo_usd = request.data.get("costo_usd")
+        cantidad_comprada = request.data.get("cantidad_comprada")
 
-        query = "UPDATE producto SET nombre = %s, precio = %s WHERE id = %s AND negocio_id = %s"
-        parametros = [nombre, precio, producto_id, negocio_id]
+        query = "UPDATE producto SET nombre = %s, precio = %s, costo = %s, lote_id = %s, costo_usd = %s, cantidad_comprada = %s WHERE id = %s AND negocio_id = %s"
+        parametros = [nombre, precio, costo, lote_id, costo_usd, cantidad_comprada, producto_id, negocio_id]
 
         filas_afectadas = execute_command(query, parametros)
 
@@ -235,3 +242,98 @@ class VentaDetalleView(APIView):
             return Response({"error": "Venta no encontrada"}, status=404)
 
         return Response({"mensaje": "Venta eliminada"})
+
+class VentasPorClienteView(APIView):
+    def get(self, request, negocio_id, cliente_id):
+        query = "SELECT id, fecha, monto_total FROM venta WHERE negocio_id = %s AND cliente_id = %s ORDER BY fecha DESC"
+        parametros = [negocio_id, cliente_id]
+        registros = fetch_all(query, parametros)
+        return Response(registros)
+
+class LotesView(APIView):
+    def get(self, request, negocio_id):
+        query = "SELECT id, negocio_id, fecha, tasa_cambio, descripcion FROM lote WHERE negocio_id = %s ORDER BY fecha DESC"
+        parametros = [negocio_id]
+        resultados = fetch_all(query, parametros)
+        return Response(resultados)
+
+    def post(self, request, negocio_id):
+        fecha = request.data.get("fecha")
+        tasa_cambio = request.data.get("tasa_cambio")
+        descripcion = request.data.get("descripcion")
+
+        query = "INSERT INTO lote (negocio_id, fecha, tasa_cambio, descripcion) VALUES (%s, %s, %s, %s)"
+        parametros = [negocio_id, fecha, tasa_cambio, descripcion]
+
+        filas_afectadas = execute_command(query, parametros)
+
+        if filas_afectadas == 0:
+            return Response({"error": "No se registro el lote"}, status=400)
+
+        return Response({"mensaje": "Lote creado"})
+
+class LoteDetalleView(APIView):
+    def put(self, request, negocio_id, lote_id):
+        fecha = request.data.get("fecha")
+        tasa_cambio = request.data.get("tasa_cambio")
+        descripcion = request.data.get("descripcion")
+
+        query = "UPDATE lote SET fecha =) %s, tasa_cambio = %s, descripcion = %s WHERE id = %s AND negocio_id = %s"
+        parametros = [fecha, tasa_cambio, descripcion, lote_id, negocio_id]
+
+        filas_afectadas = execute_command(query, parametros)
+
+        if filas_afectadas == 0:
+            return Response({"error": "Lote no actualizado"}, status=404)    
+
+        return Response({"mensaje": "Lote actualizado"})
+
+    def delete(self, request, negocio_id, lote_id):
+        query = "DELETE FROM lote WHERE id = %s AND negocio_id = %s"
+        parametros = [lote_id, negocio_id]
+
+        filas_afectadas = execute_command(query, parametros)
+
+        if filas_afectadas == 0:
+            return Response({"error": "Lote no encontrado"}, status=404)
+
+        return Response({"mensaje": "Lote eliminado"})
+
+class SugerenciaPrecioView(APIView):
+    def post(self, request, negocio_id):
+        costo_usd = request.data.get("costo_usd")
+        lote_id = request.data.get("lote_id")
+
+        if costo_usd is None or lote_id is None:
+            return Response({"error": "Faltan datos"}, status=400)
+
+        costo_usd = float(costo_usd)
+
+        query = "SELECT tasa_cambio FROM lote WHERE id = %s AND negocio_id = %s"
+        parametros = [lote_id, negocio_id]
+        lote = fetch_one(query, parametros)
+
+        if lote is None:
+            return Response({"error": "Lote no encontrado"}, status=404)
+
+        tasa_cambio = float(lote["tasa_cambio"])
+
+        costo_unitario = costo_usd * tasa_cambio
+
+        if costo_usd <= 1.50:
+            multiplicador = 2.3
+        elif costo_usd <= 2.50:
+            multiplicador = 2.25
+        elif costo_usd <= 4.00:
+            multiplicador = 2.1
+        else:
+            multiplicador = 2.2
+
+        precio_sugerido = round(costo_unitario) * multiplicador
+
+        respuesta = {
+            "costo_unitario": costo_unitario,
+            "multiplicador": multiplicador,
+            "precio_sugerido": precio_sugerido,
+        }
+        return Response(respuesta)

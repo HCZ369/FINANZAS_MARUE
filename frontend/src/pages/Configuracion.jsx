@@ -29,6 +29,16 @@ function Configuracion({ negocioId }) {
   const [nombreProducto, setNombreProducto] = useState("")
   const [precioProducto, setPrecioProducto] = useState("")
   const [editandoProductoId, setEditandoProductoId] = useState(null)
+  const [lotes, setLotes] = useState([])
+  const [fechaLote, setFechaLote] = useState("")
+  const [tasaCambio, setTasaCambio] = useState("")
+  const [descripcionLote, setDescripcionLote] = useState("")
+  const [editandoLoteId, setEditandoLoteId] = useState(null)
+  
+  const [loteProducto, setLoteProducto] = useState("")
+  const [costoUsdProducto, setCostoUsdProducto] = useState("")
+  const [cantidadProducto, setCantidadProducto] = useState("")
+  const [sugerencia, setSugerencia] = useState(null)
 
   useEffect(() => {
     cargarDatos()
@@ -40,6 +50,7 @@ function Configuracion({ negocioId }) {
     setClientes(await apiGet(`/negocios/${negocioId}/clientes/`))
     setInyecciones(await apiGet(`/negocios/${negocioId}/inyecciones/`))
     setProductos(await apiGet(`/negocios/${negocioId}/productos/`))
+    setLotes(await apiGet(`/negocios/${negocioId}/lotes/`))
   }
 
   // --- Negocio ---
@@ -139,27 +150,82 @@ function Configuracion({ negocioId }) {
 
   // --- Producto ---
   async function guardarProducto(evento) {
-    evento.preventDefault()
-    const datos = { nombre: nombreProducto, precio: precioProducto }
-    const resultado = editandoProductoId
-      ? await apiPut(`/negocios/${negocioId}/productos/${editandoProductoId}/`, datos)
-      : await apiPost(`/negocios/${negocioId}/productos/`, datos)
-    setMensaje(resultado.mensaje)
-    setNombreProducto("")
-    setPrecioProducto("")
-    setEditandoProductoId(null)
-    await cargarDatos()
+  evento.preventDefault()
+  let costoUnitario = null
+  if (sugerencia !== null) {
+    costoUnitario = sugerencia.costo_unitario
+  }
+  const datos = {
+    nombre: nombreProducto,
+    precio: precioProducto,
+    costo: costoUnitario,
+    lote_id: loteProducto,
+    costo_usd: costoUsdProducto,
+    cantidad_comprada: cantidadProducto,
+  }
+  const resultado = editandoProductoId
+    ? await apiPut(`/negocios/${negocioId}/productos/${editandoProductoId}/`, datos)
+    : await apiPost(`/negocios/${negocioId}/productos/`, datos)
+  setMensaje(resultado.mensaje)
+  setNombreProducto("")
+  setPrecioProducto("")
+  setLoteProducto("")
+  setCostoUsdProducto("")
+  setCantidadProducto("")
+  setSugerencia(null)
+  setEditandoProductoId(null)
+  await cargarDatos()
   }
   function editarProducto(p) {
-    setEditandoProductoId(p.id)
-    setNombreProducto(p.nombre)
-    setPrecioProducto(p.precio)
+  setEditandoProductoId(p.id)
+  setNombreProducto(p.nombre)
+  setPrecioProducto(p.precio)
+  setLoteProducto(p.lote_id || "")
+  setCostoUsdProducto(p.costo_usd || "")
+  setCantidadProducto(p.cantidad_comprada || "")
+  setSugerencia(null)
   }
   async function borrarProducto(id) {
     const resultado = await apiDelete(`/negocios/${negocioId}/productos/${id}/`)
     setMensaje(resultado.mensaje)
     await cargarDatos()
   }
+  async function pedirSugerencia() {
+  if (loteProducto === "" || costoUsdProducto === "") {
+    setMensaje("Elegí un lote y cargá el costo USD para calcular la sugerencia")
+    return
+  }
+  const datos = { lote_id: loteProducto, costo_usd: costoUsdProducto }
+  const resultado = await apiPost(`/negocios/${negocioId}/sugerencia-precio/`, datos)
+  setSugerencia(resultado)
+  setPrecioProducto(resultado.precio_sugerido)
+}
+
+  // -- Lotes -- 
+  async function guardarLote(evento) {
+  evento.preventDefault()
+  const datos = { fecha: fechaLote, tasa_cambio: tasaCambio, descripcion: descripcionLote }
+  const resultado = editandoLoteId
+    ? await apiPut(`/negocios/${negocioId}/lotes/${editandoLoteId}/`, datos)
+    : await apiPost(`/negocios/${negocioId}/lotes/`, datos)
+  setMensaje(resultado.mensaje)
+  setFechaLote("")
+  setTasaCambio("")
+  setDescripcionLote("")
+  setEditandoLoteId(null)
+  await cargarDatos()
+}
+function editarLote(l) {
+  setEditandoLoteId(l.id)
+  setFechaLote(l.fecha)
+  setTasaCambio(l.tasa_cambio)
+  setDescripcionLote(l.descripcion || "")
+}
+async function borrarLote(id) {
+  const resultado = await apiDelete(`/negocios/${negocioId}/lotes/${id}/`)
+  setMensaje(resultado.mensaje)
+  await cargarDatos()
+}
 
   return (
     <div>
@@ -250,10 +316,49 @@ function Configuracion({ negocioId }) {
       </section>
 
       <section>
+        <h2>Lotes</h2>
+        <form onSubmit={guardarLote}>
+          <input type="date" value={fechaLote} onChange={(e) => setFechaLote(e.target.value)} />
+          <input type="number" placeholder="Tasa de cambio" value={tasaCambio} onChange={(e) => setTasaCambio(e.target.value)} />
+          <input type="text" placeholder="Descripción" value={descripcionLote} onChange={(e) => setDescripcionLote(e.target.value)} />
+          <button type="submit">{editandoLoteId ? "Guardar" : "Crear lote"}</button>
+        </form>
+        <div className="lista-items">
+          {lotes.map((l) => (
+            <div className="fila-item" key={l.id}>
+              <span>{l.fecha} — Tasa {l.tasa_cambio} {l.descripcion ? `(${l.descripcion})` : ""}</span>
+              <div className="acciones">
+                <button onClick={() => editarLote(l)}>Editar</button>
+                <button className="btn-borrar" onClick={() => borrarLote(l.id)}>Borrar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+      
+      <section>
         <h2>Productos</h2>
         <form onSubmit={guardarProducto}>
           <input type="text" placeholder="Nombre" value={nombreProducto} onChange={(e) => setNombreProducto(e.target.value)} />
-          <input type="number" placeholder="Precio" value={precioProducto} onChange={(e) => setPrecioProducto(e.target.value)} />
+          <select value={loteProducto} onChange={(e) => setLoteProducto(e.target.value)}>
+            <option value="">Seleccionar lote</option>
+            {lotes.map((l) => (
+              <option key={l.id} value={l.id}>{l.fecha} — {l.descripcion || `Lote ${l.id}`}</option>
+            ))}
+          </select>
+          <input type="number" placeholder="Costo USD" value={costoUsdProducto} onChange={(e) => setCostoUsdProducto(e.target.value)} />
+          <input type="number" placeholder="Cantidad comprada" value={cantidadProducto} onChange={(e) => setCantidadProducto(e.target.value)} />
+          <button type="button" onClick={pedirSugerencia}>Calcular sugerencia</button>
+      
+          {sugerencia !== null && (
+            <div className="caja-sugerencia">
+              <p>Costo unitario: {sugerencia.costo_unitario}</p>
+              <p>Multiplicador: {sugerencia.multiplicador}</p>
+              <p>Precio sugerido: {sugerencia.precio_sugerido}</p>
+            </div>
+          )}
+      
+          <input type="number" placeholder="Precio final" value={precioProducto} onChange={(e) => setPrecioProducto(e.target.value)} />
           <button type="submit">{editandoProductoId ? "Guardar" : "Crear producto"}</button>
         </form>
         <div className="lista-items">
