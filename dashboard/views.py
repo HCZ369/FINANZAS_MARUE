@@ -47,6 +47,28 @@ class TotalesView(APIView):
         resultado["saldo"] = resultado["inyecciones"] + resultado["ventas"] - resultado["gastos"]
         return Response(resultado)
 
+class MargenMensualView(APIView):
+    def get(self, request, negocio_id):
+        query = """
+            SELECT YEAR(venta.fecha) as anio,
+                   MONTH(venta.fecha) as mes,
+                   SUM(venta_detalle.subtotal) as ingreso,
+                   SUM(venta_detalle.cantidad * ISNULL(producto.costo, 0)) as costo
+              FROM venta_detalle
+              JOIN venta ON venta_detalle.venta_id = venta.id
+              JOIN producto ON venta_detalle.producto_id = producto.id
+             WHERE venta.negocio_id = %s
+             GROUP BY YEAR(venta.fecha), MONTH(venta.fecha)
+             ORDER BY YEAR(venta.fecha), MONTH(venta.fecha)
+        """
+        parametros = [negocio_id]
+        resultados = fetch_all(query, parametros)
+
+        for fila in resultados:
+            fila["ganancia"] = fila["ingreso"] - fila["costo"]
+
+        return Response(resultados)
+
 class ProductosMasVendidosView(APIView):
     def get(self, request, negocio_id):
         query = """
