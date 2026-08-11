@@ -174,7 +174,33 @@ class VentasView(APIView):
 
         execute_command(query_update, parametro_update)
 
-        return Response({"mensaje": "Venta creada", "venta_id": venta_id, "monto_total": monto_acumulado})
+        avisos = []
+
+        for producto_item in productos:
+            producto_id = producto_item.get("producto_id")
+
+            query_stock = """
+                          SELECT producto.nombre AS nombre,
+                                 ISNULL(producto.cantidad_comprada, 0) - ISNULL(SUM(venta_detalle.cantidad), 0) AS stock
+                            FROM producto
+                            LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
+                           WHERE producto.id = %s
+                           GROUP BY producto.nombre, producto.cantidad_comprada  
+                          """
+            parametros_stock = [producto_id]
+            resultado_stock = fetch_one(query_stock, parametros_stock)
+
+            if resultado_stock is not None and resultado_stock["stock"] < 0:
+                aviso = {
+                    "producto": resultado_stock["nombre"],
+                    "stock": resultado_stock["stock"]
+                }
+                avisos.append(aviso)
+
+        return Response({"mensaje": "Venta creada", 
+                         "venta_id": venta_id, 
+                         "monto_total": monto_acumulado,
+                         "aviso": avisos})
 
 class VentaDetalleView(APIView):
     def get(self, request, negocio_id, venta_id):
