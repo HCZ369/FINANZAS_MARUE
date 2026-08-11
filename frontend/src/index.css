@@ -284,3 +284,33 @@ button:hover {
   margin: 0.5rem 0;
 }
 .caja-sugerencia p { margin: 0.2rem 0; font-size: 0.9rem; }
+
+.caja-aviso {
+  background-color: #2d1a0f;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin: 1rem 0;
+}
+.caja-aviso p { margin: 0.3rem 0; color: #fbbf24; }
+
+.barra-filtro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+}
+.barra-filtro label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.caja-detalle {
+  background-color: #1a1d24;
+  border: 1px solid #2d3139;
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  margin-top: 1rem;
+}
