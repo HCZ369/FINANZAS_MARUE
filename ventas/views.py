@@ -142,65 +142,76 @@ class VentasView(APIView):
         return Response(registros)
     
     def post(self, request, negocio_id):
-
         cliente_id = request.data.get("cliente_id")
         fecha = request.data.get("fecha")
         productos = request.data.get("productos")
-        monto_total = 0
 
         query = "INSERT INTO venta (negocio_id, cliente_id, fecha, monto_total) OUTPUT INSERTED.id VALUES (%s, %s, %s, %s)"
-        parametros = [negocio_id, cliente_id, fecha, monto_total]
-
+        parametros = [negocio_id, cliente_id, fecha, 0]
         venta_id = execute_insert(query, parametros)
 
         monto_acumulado = 0
 
+        ids_productos = []
+        for producto_item in productos:
+            ids_productos.append(producto_item.get("producto_id"))
+
+        precios_por_id = {}
+        if len(ids_productos) > 0:
+            marcadores = ""
+            for indice in range(len(ids_productos)):
+                if indice > 0:
+                    marcadores = marcadores + ", "
+                marcadores = marcadores + "%s"
+
+            query_precios = "SELECT id, precio FROM producto WHERE id IN (" + marcadores + ")"
+            filas_precios = fetch_all(query_precios, ids_productos)
+            for fila in filas_precios:
+                precios_por_id[fila["id"]] = fila["precio"]
+
         for producto_item in productos:
             producto_id = producto_item.get("producto_id")
             cantidad = producto_item.get("cantidad")
-            query = "SELECT precio FROM producto WHERE id = %s"
-            parametros = [producto_id]
-            precio_producto = fetch_one(query, parametros)
-            subtotal = precio_producto["precio"] * cantidad
+            precio = precios_por_id.get(producto_id)
+            subtotal = precio * cantidad
 
             query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s)"
-            parametros_detalle = [venta_id, producto_id, cantidad, precio_producto["precio"], subtotal]
+            parametros_detalle = [venta_id, producto_id, cantidad, precio, subtotal]
             execute_command(query_detalle, parametros_detalle)
 
-            monto_acumulado += subtotal
+            monto_acumulado = monto_acumulado + subtotal
 
         query_update = "UPDATE venta SET monto_total = %s WHERE id = %s"
-        parametro_update = [monto_acumulado, venta_id]
-
-        execute_command(query_update, parametro_update)
+        execute_command(query_update, [monto_acumulado, venta_id])
 
         avisos = []
-
-        for producto_item in productos:
-            producto_id = producto_item.get("producto_id")
+        if len(ids_productos) > 0:
+            marcadores = ""
+            for indice in range(len(ids_productos)):
+                if indice > 0:
+                    marcadores = marcadores + ", "
+                marcadores = marcadores + "%s"
 
             query_stock = """
-                          SELECT producto.nombre AS nombre,
-                                 ISNULL(producto.cantidad_comprada, 0) - ISNULL(SUM(venta_detalle.cantidad), 0) AS stock
-                            FROM producto
-                            LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
-                           WHERE producto.id = %s
-                           GROUP BY producto.nombre, producto.cantidad_comprada  
-                          """
-            parametros_stock = [producto_id]
-            resultado_stock = fetch_one(query_stock, parametros_stock)
+                SELECT producto.nombre AS nombre,
+                       ISNULL(producto.cantidad_comprada, 0) - ISNULL(SUM(venta_detalle.cantidad), 0) AS stock
+                  FROM producto
+                  LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
+                 WHERE producto.id IN (""" + marcadores + """)
+                 GROUP BY producto.nombre, producto.cantidad_comprada
+            """
+            filas_stock = fetch_all(query_stock, ids_productos)
+            for fila in filas_stock:
+                if fila["stock"] < 0:
+                    aviso = {"producto": fila["nombre"], "stock": fila["stock"]}
+                    avisos.append(aviso)
 
-            if resultado_stock is not None and resultado_stock["stock"] < 0:
-                aviso = {
-                    "producto": resultado_stock["nombre"],
-                    "stock": resultado_stock["stock"]
-                }
-                avisos.append(aviso)
-
-        return Response({"mensaje": "Venta creada", 
-                         "venta_id": venta_id, 
-                         "monto_total": monto_acumulado,
-                         "avisos": avisos})
+        return Response({
+            "mensaje": "Venta creada",
+            "venta_id": venta_id,
+            "monto_total": monto_acumulado,
+            "avisos": avisos,
+        })
 
 class VentaDetalleView(APIView):
     def get(self, request, negocio_id, venta_id):
