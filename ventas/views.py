@@ -200,7 +200,7 @@ class VentasView(APIView):
         return Response({"mensaje": "Venta creada", 
                          "venta_id": venta_id, 
                          "monto_total": monto_acumulado,
-                         "aviso": avisos})
+                         "avisos": avisos})
 
 class VentaDetalleView(APIView):
     def get(self, request, negocio_id, venta_id):
