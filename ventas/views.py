@@ -337,3 +337,21 @@ class SugerenciaPrecioView(APIView):
             "precio_sugerido": precio_sugerido,
         }
         return Response(respuesta)
+
+class StockView(APIView):
+    def get(self, request, negocio_id):
+        query = """
+                SELECT producto.id AS producto_id,
+                       producto.nombre AS producto_nombre,
+                       ISNULL(producto.cantidad_comprada, 0) AS comprado,
+                       ISNULL(SUM(venta_detalle.cantidad), 0) AS vendido,
+                       ISNULL(producto.cantidad_comprada, 0) - ISNULL(SUM(venta_detalle.cantidad), 0) AS stock
+                  FROM producto
+                  LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
+                 WHERE producto.negocio_id = %s
+                 GROUP BY producto.id, producto.nombre, producto.cantidad_comprada
+                 ORDER BY producto.nombre
+                """
+        parametros = [negocio_id]
+        resultados = fetch_all(query, parametros)
+        return Response(resultados)
