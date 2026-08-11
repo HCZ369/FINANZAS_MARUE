@@ -58,20 +58,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'mssql',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME'),
         'HOST': os.environ.get('DB_HOST'),
-        'PORT': os.environ.get('DB_PORT'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
         'USER': os.environ.get('DB_USER'),
         'PASSWORD': os.environ.get('DB_PASSWORD'),
-        'OPTIONS': {
-            'driver': os.environ.get('DB_DRIVER'),
-            'Trusted_Connection': os.environ.get('DB_TRUSTED_CONNECTION'),
-            'extra_params': 'Encrypt=yes;TrustServerCertificate=no',
-        },
     }
 }
-
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",

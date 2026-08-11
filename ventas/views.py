@@ -60,7 +60,7 @@ class ClienteDetalleView(APIView):
         parametros = [cliente_id, negocio_id]
 
         registros = execute_command(query, parametros)
-        
+
         if registros == 0:
             return Response({"error": "Cliente no eliminado"}, status = 404)
 
@@ -140,13 +140,13 @@ class VentasView(APIView):
         parametros = [negocio_id]
         registros = fetch_all(query, parametros)
         return Response(registros)
-    
+
     def post(self, request, negocio_id):
         cliente_id = request.data.get("cliente_id")
         fecha = request.data.get("fecha")
         productos = request.data.get("productos")
 
-        query = "INSERT INTO venta (negocio_id, cliente_id, fecha, monto_total) OUTPUT INSERTED.id VALUES (%s, %s, %s, %s)"
+        query = "INSERT INTO venta (negocio_id, cliente_id, fecha, monto_total) VALUES (%s, %s, %s, %s) RETURNING id"
         parametros = [negocio_id, cliente_id, fecha, 0]
         venta_id = execute_insert(query, parametros)
 
@@ -194,7 +194,7 @@ class VentasView(APIView):
 
             query_stock = """
                 SELECT producto.nombre AS nombre,
-                       ISNULL(producto.cantidad_comprada, 0) - ISNULL(SUM(venta_detalle.cantidad), 0) AS stock
+                       COALESCE(producto.cantidad_comprada, 0) - COALESCE(SUM(venta_detalle.cantidad), 0) AS stock
                   FROM producto
                   LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
                  WHERE producto.id IN (""" + marcadores + """)
@@ -222,7 +222,7 @@ class VentaDetalleView(APIView):
 
         if venta is None:
             return Response({"error": "Venta no encontrada"}, status = 404)
-        
+
         query_detalle = "SELECT * FROM venta_detalle WHERE venta_id = %s"
 
         parametros_detalle = [venta_id]
@@ -231,6 +231,7 @@ class VentaDetalleView(APIView):
         venta["productos"] = detalles
 
         return Response(venta)
+
     def put(self, request, negocio_id, venta_id):
         cliente_id = request.data.get("cliente_id")
         fecha = request.data.get("fecha")
@@ -315,13 +316,13 @@ class LoteDetalleView(APIView):
         tasa_cambio = request.data.get("tasa_cambio")
         descripcion = request.data.get("descripcion")
 
-        query = "UPDATE lote SET fecha =) %s, tasa_cambio = %s, descripcion = %s WHERE id = %s AND negocio_id = %s"
+        query = "UPDATE lote SET fecha = %s, tasa_cambio = %s, descripcion = %s WHERE id = %s AND negocio_id = %s"
         parametros = [fecha, tasa_cambio, descripcion, lote_id, negocio_id]
 
         filas_afectadas = execute_command(query, parametros)
 
         if filas_afectadas == 0:
-            return Response({"error": "Lote no actualizado"}, status=404)    
+            return Response({"error": "Lote no actualizado"}, status=404)
 
         return Response({"mensaje": "Lote actualizado"})
 
@@ -380,9 +381,9 @@ class StockView(APIView):
         query = """
                 SELECT producto.id AS producto_id,
                        producto.nombre AS producto_nombre,
-                       ISNULL(producto.cantidad_comprada, 0) AS comprado,
-                       ISNULL(SUM(venta_detalle.cantidad), 0) AS vendido,
-                       ISNULL(producto.cantidad_comprada, 0) - ISNULL(SUM(venta_detalle.cantidad), 0) AS stock
+                       COALESCE(producto.cantidad_comprada, 0) AS comprado,
+                       COALESCE(SUM(venta_detalle.cantidad), 0) AS vendido,
+                       COALESCE(producto.cantidad_comprada, 0) - COALESCE(SUM(venta_detalle.cantidad), 0) AS stock
                   FROM producto
                   LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
                  WHERE producto.negocio_id = %s

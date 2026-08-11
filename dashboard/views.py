@@ -18,13 +18,13 @@ class GastosPorCategoriaView(APIView):
 class EvolucionMensualView(APIView):
     def get(self, request, negocio_id):
         query = """
-            SELECT YEAR(fecha) as anio,
-                   MONTH(fecha) as mes,
+            SELECT EXTRACT(YEAR FROM fecha) as anio,
+                   EXTRACT(MONTH FROM fecha) as mes,
                    SUM(monto) as total
               FROM gasto
              WHERE negocio_id = %s
-             GROUP BY YEAR(fecha), MONTH(fecha) 
-             ORDER BY YEAR(fecha), MONTH(fecha)
+             GROUP BY EXTRACT(YEAR FROM fecha), EXTRACT(MONTH FROM fecha)
+             ORDER BY EXTRACT(YEAR FROM fecha), EXTRACT(MONTH FROM fecha)
         """
         parametros = [negocio_id]
         resultados = fetch_all(query, parametros)
@@ -35,9 +35,9 @@ class TotalesView(APIView):
     def get(self, request, negocio_id):
         query = """
             SELECT
-                (SELECT ISNULL(SUM(monto), 0) FROM inyeccion_capital WHERE negocio_id = %s) AS inyecciones,
-                (SELECT ISNULL(SUM(monto_total), 0) FROM venta WHERE negocio_id = %s) AS ventas,
-                (SELECT ISNULL(SUM(monto), 0) FROM gasto WHERE negocio_id = %s) AS gastos,
+                (SELECT COALESCE(SUM(monto), 0) FROM inyeccion_capital WHERE negocio_id = %s) AS inyecciones,
+                (SELECT COALESCE(SUM(monto_total), 0) FROM venta WHERE negocio_id = %s) AS ventas,
+                (SELECT COALESCE(SUM(monto), 0) FROM gasto WHERE negocio_id = %s) AS gastos,
                 (SELECT COUNT(*) FROM producto WHERE negocio_id = %s) AS cantidad_productos,
                 (SELECT COUNT(*) FROM cliente WHERE negocio_id = %s) AS cantidad_clientes,
                 (SELECT COUNT(*) FROM venta WHERE negocio_id = %s) AS cantidad_ventas
@@ -50,16 +50,16 @@ class TotalesView(APIView):
 class MargenMensualView(APIView):
     def get(self, request, negocio_id):
         query = """
-            SELECT YEAR(venta.fecha) as anio,
-                   MONTH(venta.fecha) as mes,
+            SELECT EXTRACT(YEAR FROM venta.fecha) as anio,
+                   EXTRACT(MONTH FROM venta.fecha) as mes,
                    SUM(venta_detalle.subtotal) as ingreso,
-                   SUM(venta_detalle.cantidad * ISNULL(producto.costo, 0)) as costo
+                   SUM(venta_detalle.cantidad * COALESCE(producto.costo, 0)) as costo
               FROM venta_detalle
               JOIN venta ON venta_detalle.venta_id = venta.id
               JOIN producto ON venta_detalle.producto_id = producto.id
              WHERE venta.negocio_id = %s
-             GROUP BY YEAR(venta.fecha), MONTH(venta.fecha)
-             ORDER BY YEAR(venta.fecha), MONTH(venta.fecha)
+             GROUP BY EXTRACT(YEAR FROM venta.fecha), EXTRACT(MONTH FROM venta.fecha)
+             ORDER BY EXTRACT(YEAR FROM venta.fecha), EXTRACT(MONTH FROM venta.fecha)
         """
         parametros = [negocio_id]
         resultados = fetch_all(query, parametros)
@@ -90,21 +90,21 @@ class ProductosMasVendidosView(APIView):
 class ProyeccionVsRealidadView(APIView):
     def get(self, request, negocio_id):
         query_ventas = """
-            SELECT FORMAT(fecha, 'yyyy-MM') AS mes, 
+            SELECT TO_CHAR(fecha, 'YYYY-MM') AS mes,
                    SUM(monto_total) AS venta_real
               FROM venta
              WHERE negocio_id = %s
-             GROUP BY FORMAT(fecha, 'yyyy-MM')
+             GROUP BY TO_CHAR(fecha, 'YYYY-MM')
         """
         parametros = [negocio_id]
         ventas_por_mes = fetch_all(query_ventas, parametros)
 
         query_inyecciones = """
-            SELECT FORMAT(fecha, 'yyyy-MM') as mes,
+            SELECT TO_CHAR(fecha, 'YYYY-MM') as mes,
                    SUM(monto) as inyeccion
               FROM inyeccion_capital
              WHERE negocio_id = %s
-             GROUP BY FORMAT(fecha, 'yyyy-MM')
+             GROUP BY TO_CHAR(fecha, 'YYYY-MM')
         """
         inyecciones_por_mes = fetch_all(query_inyecciones, parametros)
 
@@ -131,7 +131,6 @@ class ProyeccionVsRealidadView(APIView):
         resultado = []
         capital_operativo = 0
 
-        
         for mes in meses_ordenados:
             inyeccion = inyeccion_de_mes.get(mes, 0)
             capital_operativo = capital_operativo + inyeccion
