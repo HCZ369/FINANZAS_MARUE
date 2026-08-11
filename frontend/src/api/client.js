@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api"
+const API_BASE = "https://finanzas-marue-api.onrender.com/api"
 const MODO_MOCK = false
 
 export async function apiGet(ruta) {
