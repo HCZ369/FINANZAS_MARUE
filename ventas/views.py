@@ -1,15 +1,13 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from core.db import fetch_all, fetch_one, execute_command, execute_insert
+from django.db import transaction
+
 
 class ClientesView(APIView):
     def get(self, request, negocio_id):
-
         query = "SELECT * FROM cliente WHERE negocio_id = %s"
-        parametros = [negocio_id]
-
-        registros = fetch_all(query, parametros)
-
+        registros = fetch_all(query, [negocio_id])
         return Response(registros)
 
     def post(self, request, negocio_id):
@@ -25,17 +23,17 @@ class ClientesView(APIView):
         registros_afectados = execute_command(query, parametros)
 
         if registros_afectados == 0:
-            return Response({"error": "No se registro al cliente"}, status = 400)
+            return Response({"error": "No se registro al cliente"}, status=400)
 
         return Response({"mensaje": "Cliente registrado"})
+
 
 class ClienteDetalleView(APIView):
     def get(self, request, negocio_id, cliente_id):
         query = "SELECT * FROM cliente WHERE id = %s AND negocio_id = %s"
-        parametros = [cliente_id, negocio_id]
-        cliente = fetch_one(query, parametros)
+        cliente = fetch_one(query, [cliente_id, negocio_id])
         if cliente is None:
-            return Response({"error": "Cliente no encontrado"}, status = 404)
+            return Response({"error": "Cliente no encontrado"}, status=404)
         return Response(cliente)
 
     def put(self, request, negocio_id, cliente_id):
@@ -51,28 +49,24 @@ class ClienteDetalleView(APIView):
         registros = execute_command(query, parametros)
 
         if registros == 0:
-            return Response({"error": "Cliente no actualizado"}, status = 404)
+            return Response({"error": "Cliente no actualizado"}, status=404)
 
         return Response({"mensaje": "Cliente actualizado"})
 
     def delete(self, request, negocio_id, cliente_id):
         query = "DELETE FROM cliente WHERE id = %s AND negocio_id = %s"
-        parametros = [cliente_id, negocio_id]
-
-        registros = execute_command(query, parametros)
+        registros = execute_command(query, [cliente_id, negocio_id])
 
         if registros == 0:
-            return Response({"error": "Cliente no eliminado"}, status = 404)
+            return Response({"error": "Cliente no eliminado"}, status=404)
 
         return Response({"mensaje": "Cliente eliminado"})
+
 
 class ProductosView(APIView):
     def get(self, request, negocio_id):
         query = "SELECT id, negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada FROM producto WHERE negocio_id = %s"
-        parametros = [negocio_id]
-
-        registros = fetch_all(query, parametros)
-
+        registros = fetch_all(query, [negocio_id])
         return Response(registros)
 
     def post(self, request, negocio_id):
@@ -93,12 +87,11 @@ class ProductosView(APIView):
 
         return Response({"mensaje": "Producto creado"})
 
+
 class ProductoDetalleView(APIView):
     def get(self, request, negocio_id, producto_id):
         query = "SELECT * FROM producto WHERE id = %s AND negocio_id = %s"
-        parametros = [producto_id, negocio_id]
-
-        producto = fetch_one(query, parametros)
+        producto = fetch_one(query, [producto_id, negocio_id])
 
         if producto is None:
             return Response({"error": "Producto no encontrado"}, status=404)
@@ -125,20 +118,18 @@ class ProductoDetalleView(APIView):
 
     def delete(self, request, negocio_id, producto_id):
         query = "DELETE FROM producto WHERE id = %s AND negocio_id = %s"
-        parametros = [producto_id, negocio_id]
-
-        filas_afectadas = execute_command(query, parametros)
+        filas_afectadas = execute_command(query, [producto_id, negocio_id])
 
         if filas_afectadas == 0:
             return Response({"error": "Producto no eliminado"}, status=404)
 
         return Response({"mensaje": "Producto eliminado"})
 
+
 class VentasView(APIView):
     def get(self, request, negocio_id):
         query = "SELECT * FROM venta WHERE negocio_id = %s"
-        parametros = [negocio_id]
-        registros = fetch_all(query, parametros)
+        registros = fetch_all(query, [negocio_id])
         return Response(registros)
 
     def post(self, request, negocio_id):
@@ -146,87 +137,81 @@ class VentasView(APIView):
         fecha = request.data.get("fecha")
         productos = request.data.get("productos")
 
+        try:
+            with transaction.atomic():
+                venta_id = self.crear_venta(negocio_id, cliente_id, fecha, productos)
+        except Exception as error:
+            return Response({"error": "No se pudo completar la venta"}, status=400)
+
+        monto_total = self.calcular_monto(venta_id)
+        avisos = self.revisar_stock(productos)
+
+        return Response({
+            "mensaje": "Venta creada",
+            "venta_id": venta_id,
+            "monto_total": monto_total,
+            "avisos": avisos,
+        })
+
+    def crear_venta(self, negocio_id, cliente_id, fecha, productos):
         query = "INSERT INTO venta (negocio_id, cliente_id, fecha, monto_total) VALUES (%s, %s, %s, %s) RETURNING id"
-        parametros = [negocio_id, cliente_id, fecha, 0]
-        venta_id = execute_insert(query, parametros)
+        venta_id = execute_insert(query, [negocio_id, cliente_id, fecha, 0])
 
         monto_acumulado = 0
-
-        ids_productos = []
-        for producto_item in productos:
-            ids_productos.append(producto_item.get("producto_id"))
-
-        precios_por_id = {}
-        if len(ids_productos) > 0:
-            marcadores = ""
-            for indice in range(len(ids_productos)):
-                if indice > 0:
-                    marcadores = marcadores + ", "
-                marcadores = marcadores + "%s"
-
-            query_precios = "SELECT id, precio FROM producto WHERE id IN (" + marcadores + ")"
-            filas_precios = fetch_all(query_precios, ids_productos)
-            for fila in filas_precios:
-                precios_por_id[fila["id"]] = fila["precio"]
-
         for producto_item in productos:
             producto_id = producto_item.get("producto_id")
             cantidad = producto_item.get("cantidad")
-            precio = precios_por_id.get(producto_id)
+
+            query_precio = "SELECT precio FROM producto WHERE id = %s"
+            precio_producto = fetch_one(query_precio, [producto_id])
+            precio = precio_producto["precio"]
             subtotal = precio * cantidad
 
             query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s)"
-            parametros_detalle = [venta_id, producto_id, cantidad, precio, subtotal]
-            execute_command(query_detalle, parametros_detalle)
+            execute_command(query_detalle, [venta_id, producto_id, cantidad, precio, subtotal])
 
             monto_acumulado = monto_acumulado + subtotal
 
         query_update = "UPDATE venta SET monto_total = %s WHERE id = %s"
         execute_command(query_update, [monto_acumulado, venta_id])
 
+        return venta_id
+
+    def calcular_monto(self, venta_id):
+        query = "SELECT monto_total FROM venta WHERE id = %s"
+        venta = fetch_one(query, [venta_id])
+        return venta["monto_total"]
+
+    def revisar_stock(self, productos):
         avisos = []
-        if len(ids_productos) > 0:
-            marcadores = ""
-            for indice in range(len(ids_productos)):
-                if indice > 0:
-                    marcadores = marcadores + ", "
-                marcadores = marcadores + "%s"
+        for producto_item in productos:
+            producto_id = producto_item.get("producto_id")
 
             query_stock = """
                 SELECT producto.nombre AS nombre,
                        COALESCE(producto.cantidad_comprada, 0) - COALESCE(SUM(venta_detalle.cantidad), 0) AS stock
                   FROM producto
                   LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
-                 WHERE producto.id IN (""" + marcadores + """)
+                 WHERE producto.id = %s
                  GROUP BY producto.nombre, producto.cantidad_comprada
             """
-            filas_stock = fetch_all(query_stock, ids_productos)
-            for fila in filas_stock:
-                if fila["stock"] < 0:
-                    aviso = {"producto": fila["nombre"], "stock": fila["stock"]}
-                    avisos.append(aviso)
+            resultado = fetch_one(query_stock, [producto_id])
+            if resultado is not None and resultado["stock"] < 0:
+                aviso = {"producto": resultado["nombre"], "stock": resultado["stock"]}
+                avisos.append(aviso)
+        return avisos
 
-        return Response({
-            "mensaje": "Venta creada",
-            "venta_id": venta_id,
-            "monto_total": monto_acumulado,
-            "avisos": avisos,
-        })
 
 class VentaDetalleView(APIView):
     def get(self, request, negocio_id, venta_id):
         query = "SELECT * FROM venta WHERE id = %s AND negocio_id = %s"
-        parametros = [venta_id, negocio_id]
-
-        venta = fetch_one(query, parametros)
+        venta = fetch_one(query, [venta_id, negocio_id])
 
         if venta is None:
-            return Response({"error": "Venta no encontrada"}, status = 404)
+            return Response({"error": "Venta no encontrada"}, status=404)
 
         query_detalle = "SELECT * FROM venta_detalle WHERE venta_id = %s"
-
-        parametros_detalle = [venta_id]
-        detalles = fetch_all(query_detalle, parametros_detalle)
+        detalles = fetch_all(query_detalle, [venta_id])
 
         venta["productos"] = detalles
 
@@ -237,62 +222,94 @@ class VentaDetalleView(APIView):
         fecha = request.data.get("fecha")
         productos = request.data.get("productos")
 
+        try:
+            with transaction.atomic():
+                self.actualizar_venta(negocio_id, venta_id, cliente_id, fecha, productos)
+        except Exception as error:
+            return Response({"error": "No se pudo actualizar la venta"}, status=400)
+
+        monto_total = self.calcular_monto(venta_id)
+        avisos = self.revisar_stock(productos)
+
+        return Response({
+            "mensaje": "Venta actualizada",
+            "monto_total": monto_total,
+            "avisos": avisos,
+        })
+
+    def actualizar_venta(self, negocio_id, venta_id, cliente_id, fecha, productos):
         query_venta = "UPDATE venta SET cliente_id = %s, fecha = %s WHERE id = %s AND negocio_id = %s"
-        parametros_venta = [cliente_id, fecha, venta_id, negocio_id]
-        execute_command(query_venta, parametros_venta)
+        execute_command(query_venta, [cliente_id, fecha, venta_id, negocio_id])
 
         query_borrar = "DELETE FROM venta_detalle WHERE venta_id = %s"
-        parametros_borrar = [venta_id]
-        execute_command(query_borrar, parametros_borrar)
+        execute_command(query_borrar, [venta_id])
 
         monto_acumulado = 0
-
         for producto_item in productos:
             producto_id = producto_item.get("producto_id")
             cantidad = producto_item.get("cantidad")
 
             query_precio = "SELECT precio FROM producto WHERE id = %s"
-            parametros_precio = [producto_id]
-            precio_producto = fetch_one(query_precio, parametros_precio)
-            subtotal = precio_producto["precio"] * cantidad
+            precio_producto = fetch_one(query_precio, [producto_id])
+            precio = precio_producto["precio"]
+            subtotal = precio * cantidad
 
             query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s)"
-            parametros_detalle = [venta_id, producto_id, cantidad, precio_producto["precio"], subtotal]
-            execute_command(query_detalle, parametros_detalle)
+            execute_command(query_detalle, [venta_id, producto_id, cantidad, precio, subtotal])
 
-            monto_acumulado += subtotal
+            monto_acumulado = monto_acumulado + subtotal
 
         query_total = "UPDATE venta SET monto_total = %s WHERE id = %s"
-        parametros_total = [monto_acumulado, venta_id]
-        execute_command(query_total, parametros_total)
+        execute_command(query_total, [monto_acumulado, venta_id])
 
-        return Response({"mensaje": "Venta actualizada", "monto_total": monto_acumulado})
+    def calcular_monto(self, venta_id):
+        query = "SELECT monto_total FROM venta WHERE id = %s"
+        venta = fetch_one(query, [venta_id])
+        return venta["monto_total"]
+
+    def revisar_stock(self, productos):
+        avisos = []
+        for producto_item in productos:
+            producto_id = producto_item.get("producto_id")
+
+            query_stock = """
+                SELECT producto.nombre AS nombre,
+                       COALESCE(producto.cantidad_comprada, 0) - COALESCE(SUM(venta_detalle.cantidad), 0) AS stock
+                  FROM producto
+                  LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
+                 WHERE producto.id = %s
+                 GROUP BY producto.nombre, producto.cantidad_comprada
+            """
+            resultado = fetch_one(query_stock, [producto_id])
+            if resultado is not None and resultado["stock"] < 0:
+                aviso = {"producto": resultado["nombre"], "stock": resultado["stock"]}
+                avisos.append(aviso)
+        return avisos
 
     def delete(self, request, negocio_id, venta_id):
         query_borrar_detalle = "DELETE FROM venta_detalle WHERE venta_id = %s"
         execute_command(query_borrar_detalle, [venta_id])
 
         query_borrar_venta = "DELETE FROM venta WHERE id = %s AND negocio_id = %s"
-        parametros = [venta_id, negocio_id]
-        filas_afectadas = execute_command(query_borrar_venta, parametros)
+        filas_afectadas = execute_command(query_borrar_venta, [venta_id, negocio_id])
 
         if filas_afectadas == 0:
             return Response({"error": "Venta no encontrada"}, status=404)
 
         return Response({"mensaje": "Venta eliminada"})
 
+
 class VentasPorClienteView(APIView):
     def get(self, request, negocio_id, cliente_id):
         query = "SELECT id, fecha, monto_total FROM venta WHERE negocio_id = %s AND cliente_id = %s ORDER BY fecha DESC"
-        parametros = [negocio_id, cliente_id]
-        registros = fetch_all(query, parametros)
+        registros = fetch_all(query, [negocio_id, cliente_id])
         return Response(registros)
+
 
 class LotesView(APIView):
     def get(self, request, negocio_id):
         query = "SELECT id, negocio_id, fecha, tasa_cambio, descripcion FROM lote WHERE negocio_id = %s ORDER BY fecha DESC"
-        parametros = [negocio_id]
-        resultados = fetch_all(query, parametros)
+        resultados = fetch_all(query, [negocio_id])
         return Response(resultados)
 
     def post(self, request, negocio_id):
@@ -309,6 +326,7 @@ class LotesView(APIView):
             return Response({"error": "No se registro el lote"}, status=400)
 
         return Response({"mensaje": "Lote creado"})
+
 
 class LoteDetalleView(APIView):
     def put(self, request, negocio_id, lote_id):
@@ -328,14 +346,13 @@ class LoteDetalleView(APIView):
 
     def delete(self, request, negocio_id, lote_id):
         query = "DELETE FROM lote WHERE id = %s AND negocio_id = %s"
-        parametros = [lote_id, negocio_id]
-
-        filas_afectadas = execute_command(query, parametros)
+        filas_afectadas = execute_command(query, [lote_id, negocio_id])
 
         if filas_afectadas == 0:
             return Response({"error": "Lote no encontrado"}, status=404)
 
         return Response({"mensaje": "Lote eliminado"})
+
 
 class SugerenciaPrecioView(APIView):
     def post(self, request, negocio_id):
@@ -348,8 +365,7 @@ class SugerenciaPrecioView(APIView):
         costo_usd = float(costo_usd)
 
         query = "SELECT tasa_cambio FROM lote WHERE id = %s AND negocio_id = %s"
-        parametros = [lote_id, negocio_id]
-        lote = fetch_one(query, parametros)
+        lote = fetch_one(query, [lote_id, negocio_id])
 
         if lote is None:
             return Response({"error": "Lote no encontrado"}, status=404)
@@ -376,6 +392,7 @@ class SugerenciaPrecioView(APIView):
         }
         return Response(respuesta)
 
+
 class StockView(APIView):
     def get(self, request, negocio_id):
         query = """
@@ -390,6 +407,5 @@ class StockView(APIView):
                  GROUP BY producto.id, producto.nombre, producto.cantidad_comprada
                  ORDER BY producto.nombre
                 """
-        parametros = [negocio_id]
-        resultados = fetch_all(query, parametros)
+        resultados = fetch_all(query, [negocio_id])
         return Response(resultados)

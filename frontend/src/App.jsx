@@ -7,6 +7,7 @@ import Gastos from "./pages/Gastos"
 import Ventas from "./pages/Ventas"
 import Configuracion from "./pages/Configuracion"
 import Clientes from "./pages/Clientes"
+import Stock from "./pages/Stock"
 
 function App() {
   const [negocios, setNegocios] = useState([])
@@ -38,6 +39,7 @@ function App() {
           <Route path="/ventas" element={<Ventas negocioId={negocioId} />} />
           <Route path="/configuracion" element={<Configuracion negocioId={negocioId} />} />
           <Route path="/clientes" element={<Clientes negocioId={negocioId} />} />
+          <Route path="/stock" element={<Stock negocioId={negocioId} />} />
         </Route>
       </Routes>
     </BrowserRouter>

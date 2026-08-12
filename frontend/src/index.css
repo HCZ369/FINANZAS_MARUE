@@ -314,3 +314,7 @@ button:hover {
   padding: 1rem 1.2rem;
   margin-top: 1rem;
 }
+
+.stock-ok td { color: #e5e7eb; }
+.stock-bajo td { color: #fbbf24; }
+.stock-agotado td { color: #f87171; font-weight: 600; }
