@@ -4,6 +4,7 @@ function Layout({ negocioId, negocios, onCambioNegocio }) {
   const enlaces = [
     { ruta: "/", texto: "Dashboard", exacto: true },
     { ruta: "/ventas", texto: "Ventas" },
+    { ruta: "/catalogo", texto: "Catálogo" },
     { ruta: "/stock", texto: "Stock" },
     { ruta: "/clientes", texto: "Clientes" },
     { ruta: "/gastos", texto: "Gastos" },

@@ -1,12 +1,24 @@
 const API_BASE = "https://finanzas-marue-api.onrender.com/api"
-const MODO_MOCK = false
+
+async function manejarRespuesta(respuesta) {
+  if (!respuesta.ok) {
+    let detalle = respuesta.statusText
+    try {
+      const cuerpo = await respuesta.json()
+      if (cuerpo.error) {
+        detalle = cuerpo.error
+      }
+    } catch (e) {
+      // si no es JSON, usar statusText
+    }
+    throw new Error(detalle)
+  }
+  return await respuesta.json()
+}
 
 export async function apiGet(ruta) {
   const respuesta = await fetch(`${API_BASE}${ruta}`)
-  if (!respuesta.ok) {
-    throw new Error(`Error ${respuesta.status}: ${respuesta.statusText}`)
-  }
-  return await respuesta.json()
+  return await manejarRespuesta(respuesta)
 }
 
 export async function apiPost(ruta, datos) {
@@ -15,10 +27,7 @@ export async function apiPost(ruta, datos) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(datos),
   })
-  if (!respuesta.ok) {
-    throw new Error(`Error ${respuesta.status}: ${respuesta.statusText}`)
-  }
-  return await respuesta.json()
+  return await manejarRespuesta(respuesta)
 }
 
 export async function apiPut(ruta, datos) {
@@ -27,16 +36,10 @@ export async function apiPut(ruta, datos) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(datos),
   })
-  if (!respuesta.ok) {
-    throw new Error(`Error ${respuesta.status}: ${respuesta.statusText}`)
-  }
-  return await respuesta.json()
+  return await manejarRespuesta(respuesta)
 }
 
 export async function apiDelete(ruta) {
   const respuesta = await fetch(`${API_BASE}${ruta}`, { method: "DELETE" })
-  if (!respuesta.ok) {
-    throw new Error(`Error ${respuesta.status}: ${respuesta.statusText}`)
-  }
-  return await respuesta.json()
+  return await manejarRespuesta(respuesta)
 }
