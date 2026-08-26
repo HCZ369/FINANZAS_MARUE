@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from "react"
+import { useLocation } from "react-router-dom"
 import { apiGet, apiPost, apiDelete } from "../api/client"
 
 function Ventas({ negocioId }) {
+  const location = useLocation()
+
   const [ventas, setVentas] = useState([])
   const [clientes, setClientes] = useState([])
   const [productos, setProductos] = useState([])
@@ -31,6 +34,15 @@ function Ventas({ negocioId }) {
   useEffect(() => {
     cargarDatos()
   }, [negocioId])
+
+  // Recibir productos preseleccionados desde Catálogo
+  useEffect(() => {
+    if (location.state && location.state.carritoInicial) {
+      setCarrito(location.state.carritoInicial)
+      // Limpiar el state para que no se repita al navegar
+      window.history.replaceState({}, "")
+    }
+  }, [location.state])
 
   // Cerrar dropdown de clientes al hacer click fuera
   useEffect(() => {
@@ -407,6 +419,16 @@ function Ventas({ negocioId }) {
                 onChange={(e) => setFecha(e.target.value)}
               />
             </div>
+
+            <div className="campo">
+              <label>Método de pago</label>
+              <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
+                <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="tarjeta">Tarjeta</option>
+                <option value="fiado">Fiado</option>
+              </select>
+            </div>
           </div>
 
           {/* Buscador de productos */}
@@ -507,7 +529,7 @@ function Ventas({ negocioId }) {
             )}
 
             {carrito.length === 0 && (
-              <p className="carrito-vacio">Buscá un producto  para agregarlo a la venta.</p>
+              <p className="carrito-vacio">Buscá un producto arriba para agregarlo a la venta.</p>
             )}
           </div>
 
@@ -515,6 +537,7 @@ function Ventas({ negocioId }) {
           <div className="campo campo-notas">
             <label>Notas (opcional)</label>
             <textarea
+              placeholder="Ej: le fié la mitad, devolvió 1 unidad, etc."
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               rows="2"
