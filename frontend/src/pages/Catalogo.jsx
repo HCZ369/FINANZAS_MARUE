@@ -1,549 +1,1537 @@
-import { useState, useEffect } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { useNavigate } from "react-router-dom"
-import { apiGet, apiPost, apiPut, apiDelete } from "../api/client"
+
+import {
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiPut,
+} from "../api/client"
+
+const LIMITE_STOCK_BAJO = 10
+
+const FILTROS_STOCK = {
+  TODOS: "todos",
+  DISPONIBLE: "disponible",
+  BAJO: "bajo",
+  AGOTADO: "agotado",
+}
+
+const ORDENES = {
+  NOMBRE: "nombre",
+  PRECIO_ASC: "precio_asc",
+  PRECIO_DESC: "precio_desc",
+  STOCK_ASC: "stock_asc",
+  STOCK_DESC: "stock_desc",
+}
+
+const FORMULARIO_INICIAL = {
+  nombre: "",
+  precio: "",
+  loteId: "",
+  costoUsd: "",
+  cantidadComprada: "",
+  imagenUrl: "",
+}
+
+const FORMATEADOR_MONTO = new Intl.NumberFormat("es-PY", {
+  maximumFractionDigits: 0,
+})
+
+const FORMATEADOR_DECIMAL = new Intl.NumberFormat("es-PY", {
+  maximumFractionDigits: 2,
+})
 
 function Catalogo({ negocioId }) {
   const navigate = useNavigate()
+  const temporizadorMensaje = useRef(null)
 
   const [productos, setProductos] = useState([])
   const [stock, setStock] = useState([])
   const [lotes, setLotes] = useState([])
+
   const [busqueda, setBusqueda] = useState("")
-  const [filtroStock, setFiltroStock] = useState("todos")
-  const [ordenar, setOrdenar] = useState("nombre")
+  const [filtroStock, setFiltroStock] = useState(
+    FILTROS_STOCK.TODOS
+  )
+  const [ordenar, setOrdenar] = useState(ORDENES.NOMBRE)
 
-  // Selección para venta
-  const [seleccionados, setSeleccionados] = useState({}) // { productoId: cantidad }
+  const [seleccionados, setSeleccionados] = useState({})
 
-  // Modal detalle/edición
-  const [productoAbierto, setProductoAbierto] = useState(null)
-  const [modoEdicion, setModoEdicion] = useState(false)
-  const [modoCrear, setModoCrear] = useState(false)
-
-  // Formulario de edición/creación
-  const [formNombre, setFormNombre] = useState("")
-  const [formPrecio, setFormPrecio] = useState("")
-  const [formLote, setFormLote] = useState("")
-  const [formCostoUsd, setFormCostoUsd] = useState("")
-  const [formCantidad, setFormCantidad] = useState("")
-  const [formImagenUrl, setFormImagenUrl] = useState("")
+  const [productoAbiertoId, setProductoAbiertoId] = useState(null)
+  const [modalFormulario, setModalFormulario] = useState(null)
+  const [formulario, setFormulario] = useState(FORMULARIO_INICIAL)
   const [sugerencia, setSugerencia] = useState(null)
 
-  // UI
-  const [mensaje, setMensaje] = useState("")
-  const [tipoMensaje, setTipoMensaje] = useState("exito")
+  const [mensaje, setMensaje] = useState(null)
+  const [cargando, setCargando] = useState(true)
+  const [guardando, setGuardando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+  const [calculandoSugerencia, setCalculandoSugerencia] =
+    useState(false)
 
-  useEffect(function () {
-    cargarDatos()
-  }, [negocioId])
-
-  async function cargarDatos() {
-    try {
-      const productosData = await apiGet("/negocios/" + negocioId + "/productos/")
-      const stockData = await apiGet("/negocios/" + negocioId + "/stock/")
-      const lotesData = await apiGet("/negocios/" + negocioId + "/lotes/")
-      setProductos(productosData)
-      setStock(stockData)
-      setLotes(lotesData)
-    } catch (error) {
-      mostrarMsg("Error cargando datos: " + error.message, "error")
+  const mostrarMensaje = useCallback((texto, tipo = "exito") => {
+    if (temporizadorMensaje.current) {
+      window.clearTimeout(temporizadorMensaje.current)
     }
-  }
 
-  function mostrarMsg(texto, tipo) {
-    setMensaje(texto)
-    setTipoMensaje(tipo || "exito")
+    setMensaje({ texto, tipo })
+
     if (tipo !== "error") {
-      setTimeout(function () { setMensaje("") }, 4000)
+      temporizadorMensaje.current = window.setTimeout(() => {
+        setMensaje(null)
+      }, 4500)
     }
-  }
+  }, [])
 
-  function obtenerStock(productoId) {
-    for (let i = 0; i < stock.length; i++) {
-      if (stock[i].producto_id === productoId) {
-        return stock[i]
+  const cargarDatos = useCallback(async () => {
+    if (!negocioId) {
+      setProductos([])
+      setStock([])
+      setLotes([])
+      setCargando(false)
+      return
+    }
+
+    try {
+      setCargando(true)
+
+      const [productosData, stockData, lotesData] =
+        await Promise.all([
+          apiGet(`/negocios/${negocioId}/productos/`),
+          apiGet(`/negocios/${negocioId}/stock/`),
+          apiGet(`/negocios/${negocioId}/lotes/`),
+        ])
+
+      setProductos(
+        Array.isArray(productosData) ? productosData : []
+      )
+      setStock(Array.isArray(stockData) ? stockData : [])
+      setLotes(Array.isArray(lotesData) ? lotesData : [])
+    } catch (error) {
+      mostrarMensaje(
+        error?.message || "No se pudo cargar el catálogo.",
+        "error"
+      )
+    } finally {
+      setCargando(false)
+    }
+  }, [negocioId, mostrarMensaje])
+
+  useEffect(() => {
+    cargarDatos()
+  }, [cargarDatos])
+
+  useEffect(() => {
+    function cerrarConEscape(evento) {
+      if (evento.key === "Escape") {
+        cerrarModal()
       }
     }
-    return { stock: 0, comprado: 0, vendido: 0 }
-  }
 
-  function formatearMonto(valor) {
-    return Number(valor).toLocaleString("es-PY")
-  }
+    document.addEventListener("keydown", cerrarConEscape)
 
-  function colorProducto(nombre) {
-    let hash = 0
-    for (let i = 0; i < nombre.length; i++) {
-      hash = nombre.charCodeAt(i) + ((hash << 5) - hash)
+    return () => {
+      document.removeEventListener("keydown", cerrarConEscape)
     }
-    const hue = Math.abs(hash) % 360
-    return "hsl(" + hue + ", 30%, 16%)"
-  }
+  }, [])
 
-  function inicialProducto(nombre) {
-    const palabras = nombre.trim().split(" ")
-    if (palabras.length >= 2) {
-      return (palabras[0][0] + palabras[1][0]).toUpperCase()
+  useEffect(() => {
+    return () => {
+      if (temporizadorMensaje.current) {
+        window.clearTimeout(temporizadorMensaje.current)
+      }
     }
-    return nombre.substring(0, 2).toUpperCase()
-  }
+  }, [])
 
-  // --- Filtro y orden ---
-  function productosFiltrados() {
-    let resultado = []
+  const stockPorProducto = useMemo(() => {
+    return new Map(
+      stock.map((registro) => [
+        String(registro.producto_id),
+        {
+          stock: convertirNumero(registro.stock),
+          comprado: convertirNumero(registro.comprado),
+          vendido: convertirNumero(registro.vendido),
+        },
+      ])
+    )
+  }, [stock])
 
-    for (let i = 0; i < productos.length; i++) {
-      const p = productos[i]
-      const infoStock = obtenerStock(p.id)
-
-      if (busqueda.trim()) {
-        if (!p.nombre.toLowerCase().includes(busqueda.toLowerCase())) {
-          continue
-        }
+  const productosCompletos = useMemo(() => {
+    return productos.map((producto) => {
+      const informacionStock = stockPorProducto.get(
+        String(producto.id)
+      ) || {
+        stock: 0,
+        comprado: 0,
+        vendido: 0,
       }
 
-      if (filtroStock === "disponible" && infoStock.stock <= 0) { continue }
-      if (filtroStock === "bajo" && (infoStock.stock <= 0 || infoStock.stock > 10)) { continue }
-      if (filtroStock === "agotado" && infoStock.stock > 0) { continue }
+      return {
+        id: producto.id,
+        nombre: producto.nombre?.trim() || "Producto sin nombre",
+        precio: convertirNumero(producto.precio),
+        imagen_url: producto.imagen_url || "",
+        costo_usd: producto.costo_usd ?? "",
+        lote_id: producto.lote_id ?? "",
+        cantidad_comprada: producto.cantidad_comprada ?? "",
+        ...informacionStock,
+      }
+    })
+  }, [productos, stockPorProducto])
 
-      resultado.push({
-        id: p.id,
-        nombre: p.nombre,
-        precio: Number(p.precio),
-        imagen_url: p.imagen_url || null,
-        costo_usd: p.costo_usd || null,
-        lote_id: p.lote_id || null,
-        cantidad_comprada: p.cantidad_comprada || null,
-        stock: infoStock.stock,
-        comprado: infoStock.comprado,
-        vendido: infoStock.vendido,
+  const productoAbierto = useMemo(() => {
+    if (!productoAbiertoId) return null
+
+    return (
+      productosCompletos.find(
+        (producto) =>
+          String(producto.id) === String(productoAbiertoId)
+      ) || null
+    )
+  }, [productoAbiertoId, productosCompletos])
+
+  const conteos = useMemo(() => {
+    return productosCompletos.reduce(
+      (resultado, producto) => {
+        const estado = obtenerEstadoStock(producto.stock)
+
+        resultado.total += 1
+        resultado[estado] += 1
+
+        return resultado
+      },
+      {
+        total: 0,
+        disponible: 0,
+        bajo: 0,
+        agotado: 0,
+      }
+    )
+  }, [productosCompletos])
+
+  const productosFiltrados = useMemo(() => {
+    const termino = normalizarTexto(busqueda)
+
+    return productosCompletos
+      .filter((producto) => {
+        const coincideBusqueda =
+          !termino ||
+          normalizarTexto(producto.nombre).includes(termino)
+
+        const estado = obtenerEstadoStock(producto.stock)
+
+        const coincideEstado =
+          filtroStock === FILTROS_STOCK.TODOS ||
+          estado === filtroStock
+
+        return coincideBusqueda && coincideEstado
       })
+      .sort((a, b) => ordenarProductos(a, b, ordenar))
+  }, [
+    productosCompletos,
+    busqueda,
+    filtroStock,
+    ordenar,
+  ])
+
+  const resumenSeleccion = useMemo(() => {
+    const items = Object.values(seleccionados)
+
+    return {
+      items,
+      productos: items.length,
+      unidades: items.reduce(
+        (total, item) =>
+          total + Math.max(1, convertirNumero(item.cantidad, 1)),
+        0
+      ),
+      total: items.reduce(
+        (total, item) =>
+          total +
+          convertirNumero(item.precio_vendido) *
+            Math.max(1, convertirNumero(item.cantidad, 1)),
+        0
+      ),
     }
+  }, [seleccionados])
 
-    if (ordenar === "nombre") {
-      resultado.sort(function (a, b) { return a.nombre.localeCompare(b.nombre) })
-    } else if (ordenar === "precio_asc") {
-      resultado.sort(function (a, b) { return a.precio - b.precio })
-    } else if (ordenar === "precio_desc") {
-      resultado.sort(function (a, b) { return b.precio - a.precio })
-    } else if (ordenar === "stock_asc") {
-      resultado.sort(function (a, b) { return a.stock - b.stock })
+  const formularioValido = useMemo(() => {
+    return (
+      formulario.nombre.trim().length > 0 &&
+      convertirNumero(formulario.precio) > 0
+    )
+  }, [formulario])
+
+  function actualizarFormulario(campo, valor) {
+    setFormulario((formularioActual) => ({
+      ...formularioActual,
+      valor,
+    }))
+
+    if (
+      campo === "loteId" ||
+      campo === "costoUsd" ||
+      campo === "cantidadComprada"
+    ) {
+      setSugerencia(null)
     }
-
-    return resultado
   }
 
-  function claseEstado(cantidad) {
-    if (cantidad <= 0) { return "cat-estado cat-agotado" }
-    if (cantidad <= 10) { return "cat-estado cat-bajo" }
-    return "cat-estado cat-ok"
-  }
-
-  function textoEstado(cantidad) {
-    if (cantidad <= 0) { return "Agotado" }
-    return cantidad + " uds."
-  }
-
-  // --- Selección para venta ---
-  function toggleSeleccion(producto, evento) {
-    evento.stopPropagation()
-    const nuevo = Object.assign({}, seleccionados)
-    if (nuevo[producto.id]) {
-      delete nuevo[producto.id]
-    } else {
-      nuevo[producto.id] = {
-        producto_id: String(producto.id),
-        nombre: producto.nombre,
-        cantidad: 1,
-        precio_lista: producto.precio,
-        precio_vendido: producto.precio,
-      }
-    }
-    setSeleccionados(nuevo)
-  }
-
-  function cantidadSeleccionados() {
-    return Object.keys(seleccionados).length
-  }
-
-  function irAVenta() {
-    const items = []
-    const ids = Object.keys(seleccionados)
-    for (let i = 0; i < ids.length; i++) {
-      items.push(seleccionados[ids[i]])
-    }
-    navigate("/ventas", { state: { carritoInicial: items } })
-  }
-
-  // --- Modal detalle ---
   function abrirDetalle(producto) {
-    setProductoAbierto(producto)
-    setModoEdicion(false)
-    setModoCrear(false)
+    setProductoAbiertoId(producto.id)
+    setModalFormulario(null)
     setSugerencia(null)
+  }
+
+  function abrirCreacion() {
+    setProductoAbiertoId(null)
+    setFormulario(FORMULARIO_INICIAL)
+    setSugerencia(null)
+    setModalFormulario("crear")
+  }
+
+  function abrirEdicion(producto) {
+    setFormulario({
+      nombre: producto.nombre || "",
+      precio: valorParaInput(producto.precio),
+      loteId: valorParaInput(producto.lote_id),
+      costoUsd: valorParaInput(producto.costo_usd),
+      cantidadComprada: valorParaInput(
+        producto.cantidad_comprada
+      ),
+      imagenUrl: producto.imagen_url || "",
+    })
+
+    setProductoAbiertoId(producto.id)
+    setSugerencia(null)
+    setModalFormulario("editar")
   }
 
   function cerrarModal() {
-    setProductoAbierto(null)
-    setModoEdicion(false)
-    setModoCrear(false)
-    setSugerencia(null)
-  }
-
-  // --- Edición ---
-  function iniciarEdicion(producto) {
-    setModoEdicion(true)
-    setModoCrear(false)
-    setFormNombre(producto.nombre)
-    setFormPrecio(String(producto.precio))
-    setFormLote(producto.lote_id ? String(producto.lote_id) : "")
-    setFormCostoUsd(producto.costo_usd ? String(producto.costo_usd) : "")
-    setFormCantidad(producto.cantidad_comprada ? String(producto.cantidad_comprada) : "")
-    setFormImagenUrl(producto.imagen_url || "")
-    setSugerencia(null)
-  }
-
-  function iniciarCreacion() {
-    setProductoAbierto(null)
-    setModoCrear(true)
-    setModoEdicion(false)
-    setFormNombre("")
-    setFormPrecio("")
-    setFormLote("")
-    setFormCostoUsd("")
-    setFormCantidad("")
-    setFormImagenUrl("")
-    setSugerencia(null)
-  }
-
-  async function guardarProducto() {
-    if (!formNombre.trim()) {
-      mostrarMsg("El nombre es obligatorio", "error")
-      return
-    }
-    if (!formPrecio || Number(formPrecio) <= 0) {
-      mostrarMsg("Ingresá un precio válido", "error")
+    if (guardando || eliminando || calculandoSugerencia) {
       return
     }
 
-    let costoUnitario = null
-    if (sugerencia !== null) {
-      costoUnitario = sugerencia.costo_unitario
+    setProductoAbiertoId(null)
+    setModalFormulario(null)
+    setFormulario(FORMULARIO_INICIAL)
+    setSugerencia(null)
+  }
+
+  function alternarSeleccion(producto, evento) {
+    evento.stopPropagation()
+
+    if (producto.stock <= 0) {
+      mostrarMensaje(
+        `"${producto.nombre}" no tiene stock disponible.`,
+        "error"
+      )
+      return
+    }
+
+    setSeleccionados((seleccionActual) => {
+      const productoId = String(producto.id)
+      const nuevaSeleccion = { ...seleccionActual }
+
+      if (nuevaSeleccion[productoId]) {
+        delete nuevaSeleccion[productoId]
+      } else {
+        nuevaSeleccion[productoId] = {
+          producto_id: productoId,
+          nombre: producto.nombre,
+          cantidad: 1,
+          precio_lista: producto.precio,
+          precio_vendido: producto.precio,
+        }
+      }
+
+      return nuevaSeleccion
+    })
+  }
+
+  function limpiarSeleccion() {
+    setSeleccionados({})
+  }
+
+  function irAVenta() {
+    if (resumenSeleccion.items.length === 0) return
+
+    navigate("/ventas", {
+      state: {
+        carritoInicial: resumenSeleccion.items,
+      },
+    })
+  }
+
+  function limpiarFiltros() {
+    setBusqueda("")
+    setFiltroStock(FILTROS_STOCK.TODOS)
+    setOrdenar(ORDENES.NOMBRE)
+  }
+
+  function validarFormulario() {
+    if (!formulario.nombre.trim()) {
+      return "El nombre del producto es obligatorio."
+    }
+
+    if (convertirNumero(formulario.precio) <= 0) {
+      return "Ingresá un precio mayor que cero."
+    }
+
+    if (
+      formulario.costoUsd !== "" &&
+      convertirNumero(formulario.costoUsd) < 0
+    ) {
+      return "El costo en USD no puede ser negativo."
+    }
+
+    if (
+      formulario.cantidadComprada !== "" &&
+      convertirNumero(formulario.cantidadComprada) < 0
+    ) {
+      return "La cantidad comprada no puede ser negativa."
+    }
+
+    if (
+      formulario.imagenUrl.trim() &&
+      !esUrlValida(formulario.imagenUrl)
+    ) {
+      return "La dirección de la imagen no es válida."
+    }
+
+    return null
+  }
+
+  async function guardarProducto(evento) {
+    evento.preventDefault()
+
+    const errorValidacion = validarFormulario()
+
+    if (errorValidacion) {
+      mostrarMensaje(errorValidacion, "error")
+      return
     }
 
     const datos = {
-      nombre: formNombre,
-      precio: formPrecio,
-      costo: costoUnitario,
-      lote_id: formLote || null,
-      costo_usd: formCostoUsd || null,
-      cantidad_comprada: formCantidad || null,
-      imagen_url: formImagenUrl || null,
+      nombre: formulario.nombre.trim(),
+      precio: convertirNumero(formulario.precio),
+      costo:
+        sugerencia?.costo_unitario != null
+          ? convertirNumero(sugerencia.costo_unitario)
+          : null,
+      lote_id: formulario.loteId
+        ? Number(formulario.loteId)
+        : null,
+      costo_usd:
+        formulario.costoUsd !== ""
+          ? convertirNumero(formulario.costoUsd)
+          : null,
+      cantidad_comprada:
+        formulario.cantidadComprada !== ""
+          ? convertirNumero(formulario.cantidadComprada)
+          : null,
+      imagen_url: formulario.imagenUrl.trim() || null,
     }
 
     try {
-      let resultado
-      if (modoCrear) {
-        resultado = await apiPost("/negocios/" + negocioId + "/productos/", datos)
-      } else {
-        resultado = await apiPut("/negocios/" + negocioId + "/productos/" + productoAbierto.id + "/", datos)
-      }
-      mostrarMsg(resultado.mensaje)
-      cerrarModal()
+      setGuardando(true)
+
+      const resultado =
+        modalFormulario === "crear"
+          ? await apiPost(
+              `/negocios/${negocioId}/productos/`,
+              datos
+            )
+          : await apiPut(
+              `/negocios/${negocioId}/productos/${productoAbiertoId}/`,
+              datos
+            )
+
+      mostrarMensaje(
+        resultado?.mensaje ||
+          (modalFormulario === "crear"
+            ? "Producto creado correctamente."
+            : "Producto actualizado correctamente.")
+      )
+
+      cerrarModalForzado()
       await cargarDatos()
     } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
+      mostrarMensaje(
+        error?.message || "No se pudo guardar el producto.",
+        "error"
+      )
+    } finally {
+      setGuardando(false)
     }
   }
 
-  async function borrarProducto(productoId) {
-    if (!confirm("¿Eliminar este producto?")) { return }
+  async function borrarProducto(producto) {
+    const debeEliminarse = window.confirm(
+      `¿Eliminar "${producto.nombre}"? Esta acción no se puede deshacer.`
+    )
+
+    if (!debeEliminarse) return
+
     try {
-      const resultado = await apiDelete("/negocios/" + negocioId + "/productos/" + productoId + "/")
-      mostrarMsg(resultado.mensaje)
-      cerrarModal()
-      await cargarDatos()
+      setEliminando(true)
+
+      const resultado = await apiDelete(
+        `/negocios/${negocioId}/productos/${producto.id}/`
+      )
+
+      setProductos((productosActuales) =>
+        productosActuales.filter(
+          (item) => String(item.id) !== String(producto.id)
+        )
+      )
+
+      setStock((stockActual) =>
+        stockActual.filter(
+          (item) =>
+            String(item.producto_id) !== String(producto.id)
+        )
+      )
+
+      setSeleccionados((seleccionActual) => {
+        const nuevaSeleccion = { ...seleccionActual }
+        delete nuevaSeleccion[String(producto.id)]
+        return nuevaSeleccion
+      })
+
+      cerrarModalForzado()
+
+      mostrarMensaje(
+        resultado?.mensaje || "Producto eliminado correctamente."
+      )
     } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
+      mostrarMensaje(
+        error?.message || "No se pudo eliminar el producto.",
+        "error"
+      )
+    } finally {
+      setEliminando(false)
     }
   }
 
   async function pedirSugerencia() {
-    if (!formLote || !formCostoUsd) {
-      mostrarMsg("Elegí un lote y cargá el costo USD", "error")
+    if (!formulario.loteId) {
+      mostrarMensaje("Seleccioná un lote.", "error")
       return
     }
+
+    if (convertirNumero(formulario.costoUsd) <= 0) {
+      mostrarMensaje(
+        "Ingresá un costo en USD mayor que cero.",
+        "error"
+      )
+      return
+    }
+
     try {
-      const resultado = await apiPost("/negocios/" + negocioId + "/sugerencia-precio/", {
-        lote_id: formLote,
-        costo_usd: formCostoUsd,
-      })
+      setCalculandoSugerencia(true)
+
+      const resultado = await apiPost(
+        `/negocios/${negocioId}/sugerencia-precio/`,
+        {
+          lote_id: Number(formulario.loteId),
+          costo_usd: convertirNumero(formulario.costoUsd),
+        }
+      )
+
       setSugerencia(resultado)
-      setFormPrecio(String(resultado.precio_sugerido))
+
+      if (resultado?.precio_sugerido != null) {
+        actualizarFormulario(
+          "precio",
+          String(resultado.precio_sugerido)
+        )
+      }
     } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
+      mostrarMensaje(
+        error?.message ||
+          "No se pudo calcular la sugerencia de precio.",
+        "error"
+      )
+    } finally {
+      setCalculandoSugerencia(false)
     }
   }
 
-  // Conteos
-  let totalOk = 0
-  let totalBajo = 0
-  let totalAgotado = 0
-  for (let i = 0; i < productos.length; i++) {
-    const info = obtenerStock(productos[i].id)
-    if (info.stock <= 0) { totalAgotado++ }
-    else if (info.stock <= 10) { totalBajo++ }
-    else { totalOk++ }
+  function cerrarModalForzado() {
+    setProductoAbiertoId(null)
+    setModalFormulario(null)
+    setFormulario(FORMULARIO_INICIAL)
+    setSugerencia(null)
   }
 
-  const lista = productosFiltrados()
-  const haySeleccion = cantidadSeleccionados() > 0
+  if (cargando) {
+    return (
+      <main className="pagina-catalogo">
+        <div className="cat-header">
+          <div>
+            <h1>Catálogo</h1>
+            <p className="cat-subtitulo">
+              Productos, precios y disponibilidad.
+            </p>
+          </div>
+        </div>
+
+        <div className="catalogo-cargando">
+          <div className="grafico-cargando-linea" />
+          <span>Cargando productos...</span>
+        </div>
+      </main>
+    )
+  }
 
   return (
-    <div>
-      <div className="cat-header">
-        <h1>Catálogo</h1>
-        <button className="btn-principal" onClick={iniciarCreacion}>+ Nuevo producto</button>
-      </div>
+    <main className="pagina-catalogo">
+      <header className="cat-header">
+        <div>
+          <h1>Catálogo</h1>
+          <p className="cat-subtitulo">
+            Administrá productos, precios y disponibilidad.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="btn-principal"
+          onClick={abrirCreacion}
+        >
+          Nuevo producto
+        </button>
+      </header>
 
       {mensaje && (
-        <div className={tipoMensaje === "error" ? "msg msg-error" : "msg msg-exito"}>
-          {mensaje}
-          <button className="btn-cerrar-msg" onClick={function () { setMensaje("") }}>×</button>
+        <div
+          className={
+            mensaje.tipo === "error"
+              ? "msg msg-error"
+              : "msg msg-exito"
+          }
+          role={mensaje.tipo === "error" ? "alert" : "status"}
+        >
+          <span>{mensaje.texto}</span>
+
+          <button
+            type="button"
+            className="btn-cerrar-msg"
+            onClick={() => setMensaje(null)}
+            aria-label="Cerrar mensaje"
+          >
+            ×
+          </button>
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="cat-toolbar">
-        <input
-          type="text"
-          placeholder="Buscar producto..."
-          value={busqueda}
-          onChange={function (e) { setBusqueda(e.target.value) }}
-          className="cat-input-busqueda"
-        />
-        <div className="filtros-stock">
-          <button className={filtroStock === "todos" ? "btn-filtro activo" : "btn-filtro"} onClick={function () { setFiltroStock("todos") }}>Todos ({productos.length})</button>
-          <button className={filtroStock === "disponible" ? "btn-filtro activo" : "btn-filtro"} onClick={function () { setFiltroStock("disponible") }}>OK ({totalOk})</button>
-          <button className={filtroStock === "bajo" ? "btn-filtro activo" : "btn-filtro"} onClick={function () { setFiltroStock("bajo") }}>Bajo ({totalBajo})</button>
-          <button className={filtroStock === "agotado" ? "btn-filtro activo" : "btn-filtro"} onClick={function () { setFiltroStock("agotado") }}>Agotado ({totalAgotado})</button>
-        </div>
-        <select className="cat-select-orden" value={ordenar} onChange={function (e) { setOrdenar(e.target.value) }}>
-          <option value="nombre">Nombre A-Z</option>
-          <option value="precio_asc">Precio: menor</option>
-          <option value="precio_desc">Precio: mayor</option>
-          <option value="stock_asc">Menos stock</option>
-        </select>
-      </div>
+      <section
+        className="cat-controles"
+        aria-label="Controles del catálogo"
+      >
+        <div className="cat-toolbar">
+          <div className="cat-buscador">
+            <label htmlFor="buscar-catalogo">
+              Buscar producto
+            </label>
 
-      <p className="cat-conteo">{lista.length} producto{lista.length !== 1 ? "s" : ""}</p>
-
-      {/* Grid */}
-      <div className="cat-grid">
-        {lista.map(function (p) {
-          const estaSeleccionado = seleccionados[p.id] !== undefined
-          return (
-            <div
-              key={p.id}
-              className={
-                "cat-card" +
-                (p.stock <= 0 ? " cat-card-agotado" : "") +
-                (estaSeleccionado ? " cat-card-seleccionado" : "")
+            <input
+              id="buscar-catalogo"
+              type="search"
+              placeholder="Nombre del producto"
+              value={busqueda}
+              onChange={(evento) =>
+                setBusqueda(evento.target.value)
               }
-              onClick={function () { abrirDetalle(p) }}
+              className="cat-input-busqueda"
+            />
+          </div>
+
+          <div className="cat-filtros">
+            <span className="cat-control-etiqueta">
+              Disponibilidad
+            </span>
+
+            <div
+              className="filtros-stock"
+              aria-label="Filtrar por disponibilidad"
             >
-              {/* Zona visual */}
-              <div className="cat-card-visual" style={{ backgroundColor: colorProducto(p.nombre) }}>
-                {p.imagen_url ? (
-                  <img
-                    src={p.imagen_url}
-                    alt={p.nombre}
-                    className="cat-card-img"
-                    onError={function (e) { e.target.style.display = "none" }}
-                  />
-                ) : null}
-                <span className="cat-card-inicial">{inicialProducto(p.nombre)}</span>
-                <span className={claseEstado(p.stock)}>{textoEstado(p.stock)}</span>
+              <BotonFiltro
+                activo={filtroStock === FILTROS_STOCK.TODOS}
+                onClick={() =>
+                  setFiltroStock(FILTROS_STOCK.TODOS)
+                }
+              >
+                Todos {conteos.total}
+              </BotonFiltro>
 
-                {/* Botón seleccionar para venta */}
-                <button
-                  className={"cat-btn-seleccionar" + (estaSeleccionado ? " seleccionado" : "")}
-                  onClick={function (e) { toggleSeleccion(p, e) }}
-                  title={estaSeleccionado ? "Quitar de venta" : "Agregar a venta"}
-                >
-                  {estaSeleccionado ? "✓" : "+"}
-                </button>
-              </div>
+              <BotonFiltro
+                activo={
+                  filtroStock === FILTROS_STOCK.DISPONIBLE
+                }
+                onClick={() =>
+                  setFiltroStock(FILTROS_STOCK.DISPONIBLE)
+                }
+              >
+                Disponible {conteos.disponible}
+              </BotonFiltro>
 
-              <div className="cat-card-info">
-                <span className="cat-card-nombre" title={p.nombre}>{p.nombre}</span>
-                <div className="cat-card-pie">
-                  <span className="cat-card-precio">{formatearMonto(p.precio)}</span>
-                  {p.vendido > 0 && (
-                    <span className="cat-card-vendidos">{p.vendido} vend.</span>
-                  )}
-                </div>
-              </div>
+              <BotonFiltro
+                activo={filtroStock === FILTROS_STOCK.BAJO}
+                onClick={() =>
+                  setFiltroStock(FILTROS_STOCK.BAJO)
+                }
+              >
+                Bajo {conteos.bajo}
+              </BotonFiltro>
+
+              <BotonFiltro
+                activo={filtroStock === FILTROS_STOCK.AGOTADO}
+                onClick={() =>
+                  setFiltroStock(FILTROS_STOCK.AGOTADO)
+                }
+              >
+                Agotado {conteos.agotado}
+              </BotonFiltro>
             </div>
-          )
-        })}
+          </div>
 
-        {lista.length === 0 && (
-          <p className="cat-vacio">
-            {busqueda ? "Sin resultados para \"" + busqueda + "\"" : "No hay productos cargados"}
-          </p>
-        )}
-      </div>
+          <div className="cat-orden">
+            <label htmlFor="orden-catalogo">Ordenar</label>
 
-      {/* Barra flotante de venta */}
-      {haySeleccion && (
+            <select
+              id="orden-catalogo"
+              className="cat-select-orden"
+              value={ordenar}
+              onChange={(evento) => setOrdenar(evento.target.value)}
+            >
+              <option value={ORDENES.NOMBRE}>Nombre A-Z</option>
+              <option value={ORDENES.PRECIO_ASC}>
+                Menor precio
+              </option>
+              <option value={ORDENES.PRECIO_DESC}>
+                Mayor precio
+              </option>
+              <option value={ORDENES.STOCK_ASC}>
+                Menor stock
+              </option>
+              <option value={ORDENES.STOCK_DESC}>
+                Mayor stock
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div className="cat-resultados">
+          <span>
+            Mostrando {productosFiltrados.length} de{" "}
+            {productosCompletos.length} productos
+          </span>
+
+          {(busqueda ||
+            filtroStock !== FILTROS_STOCK.TODOS ||
+            ordenar !== ORDENES.NOMBRE) && (
+            <button
+              type="button"
+              className="cat-limpiar-filtros"
+              onClick={limpiarFiltros}
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+      </section>
+
+      {productosFiltrados.length > 0 ? (
+        <div className="cat-grid">
+          {productosFiltrados.map((producto) => (
+            <TarjetaProducto
+              key={producto.id}
+              producto={producto}
+              seleccionado={
+                seleccionados[String(producto.id)] != null
+              }
+              onAbrir={() => abrirDetalle(producto)}
+              onSeleccionar={(evento) =>
+                alternarSeleccion(producto, evento)
+              }
+            />
+          ))}
+        </div>
+      ) : (
+        <EstadoCatalogo
+          titulo={
+            productosCompletos.length === 0
+              ? "No hay productos cargados"
+              : "No se encontraron productos"
+          }
+          descripcion={
+            productosCompletos.length === 0
+              ? "Creá el primer producto para comenzar a utilizar el catálogo."
+              : `No hay coincidencias para los filtros seleccionados${
+                  busqueda.trim()
+                    ? ` y la búsqueda "${busqueda.trim()}"`
+                    : ""
+                }.`
+          }
+          mostrarBoton={productosCompletos.length === 0}
+          onCrear={abrirCreacion}
+          onLimpiar={limpiarFiltros}
+        />
+      )}
+
+      {resumenSeleccion.productos > 0 && (
         <div className="cat-barra-venta">
-          <span>{cantidadSeleccionados()} producto{cantidadSeleccionados() !== 1 ? "s" : ""} seleccionado{cantidadSeleccionados() !== 1 ? "s" : ""}</span>
+          <div className="cat-seleccion-resumen">
+            <span className="cat-seleccion-cantidad">
+              {resumenSeleccion.productos}{" "}
+              {resumenSeleccion.productos === 1
+                ? "producto"
+                : "productos"}
+            </span>
+
+            <span className="cat-seleccion-total">
+              Total estimado:{" "}
+              {formatearMonto(resumenSeleccion.total)}
+            </span>
+          </div>
+
           <div className="cat-barra-acciones">
-            <button className="btn-secundario" onClick={function () { setSeleccionados({}) }}>Limpiar</button>
-            <button className="btn-principal" onClick={irAVenta}>Ir a venta</button>
+            <button
+              type="button"
+              className="btn-secundario"
+              onClick={limpiarSeleccion}
+            >
+              Limpiar
+            </button>
+
+            <button
+              type="button"
+              className="btn-principal"
+              onClick={irAVenta}
+            >
+              Continuar a venta
+            </button>
           </div>
         </div>
       )}
 
-      {/* ===== MODAL DETALLE ===== */}
-      {productoAbierto !== null && !modoEdicion && (
-        <div className="modal-overlay" onClick={cerrarModal}>
-          <div className="modal-contenido cat-modal" onClick={function (e) { e.stopPropagation() }}>
-            <div className="modal-cabecera">
-              <h3>{productoAbierto.nombre}</h3>
-              <button className="btn-cerrar-modal" onClick={cerrarModal}>×</button>
+      {productoAbierto && !modalFormulario && (
+        <ModalProducto
+          producto={productoAbierto}
+          onCerrar={cerrarModal}
+          onEditar={() => abrirEdicion(productoAbierto)}
+          onEliminar={() => borrarProducto(productoAbierto)}
+          eliminando={eliminando}
+        />
+      )}
+
+      {modalFormulario && (
+        <ModalFormularioProducto
+          modo={modalFormulario}
+          formulario={formulario}
+          lotes={lotes}
+          sugerencia={sugerencia}
+          guardando={guardando}
+          calculandoSugerencia={calculandoSugerencia}
+          formularioValido={formularioValido}
+          onCambiar={actualizarFormulario}
+          onSugerencia={pedirSugerencia}
+          onGuardar={guardarProducto}
+          onCerrar={cerrarModal}
+        />
+      )}
+    </main>
+  )
+}
+
+function TarjetaProducto({
+  producto,
+  seleccionado,
+  onAbrir,
+  onSeleccionar,
+}) {
+  const estaAgotado = producto.stock <= 0
+  const estado = obtenerEstadoStock(producto.stock)
+
+  function manejarTeclado(evento) {
+    if (evento.key === "Enter" || evento.key === " ") {
+      evento.preventDefault()
+      onAbrir()
+    }
+  }
+
+  return (
+    <article
+      className={[
+        "cat-card",
+        estaAgotado ? "cat-card-agotado" : "",
+        seleccionado ? "cat-card-seleccionado" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      onClick={onAbrir}
+      onKeyDown={manejarTeclado}
+      role="button"
+      tabIndex={0}
+      aria-label={`Ver detalle de ${producto.nombre}`}
+    >
+      <div
+        className="cat-card-visual"
+        style={{
+          backgroundColor: obtenerColorProducto(producto.nombre),
+        }}
+      >
+        {producto.imagen_url}
+
+        <span className="cat-card-inicial" aria-hidden="true">
+          {obtenerIniciales(producto.nombre)}
+        </span>
+
+        <span className={`cat-estado cat-${estado}`}>
+          {obtenerTextoEstado(producto.stock)}
+        </span>
+
+        <button
+          type="button"
+          className={[
+            "cat-btn-seleccionar",
+            seleccionado ? "seleccionado" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          onClick={onSeleccionar}
+          disabled={estaAgotado}
+          aria-label={
+            estaAgotado
+              ? `${producto.nombre} está agotado`
+              : seleccionado
+                ? `Quitar ${producto.nombre} de la venta`
+                : `Agregar ${producto.nombre} a la venta`
+          }
+          title={
+            estaAgotado
+              ? "Producto agotado"
+              : seleccionado
+                ? "Quitar de la venta"
+                : "Agregar a la venta"
+          }
+        >
+          {seleccionado ? "✓" : "+"}
+        </button>
+      </div>
+
+      <div className="cat-card-info">
+        <span
+          className="cat-card-nombre"
+          title={producto.nombre}
+        >
+          {producto.nombre}
+        </span>
+
+        <div className="cat-card-pie">
+          <span className="cat-card-precio">
+            {formatearMonto(producto.precio)}
+          </span>
+
+          <span className="cat-card-vendidos">
+            {producto.vendido > 0
+              ? `${formatearCantidad(
+                  producto.vendido
+                )} vendidos`
+              : "Sin ventas"}
+          </span>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function ModalProducto({
+  producto,
+  onCerrar,
+  onEditar,
+  onEliminar,
+  eliminando,
+}) {
+  const estado = obtenerEstadoStock(producto.stock)
+
+  return (
+    <Modal
+      titulo={producto.nombre}
+      etiqueta="Detalle del producto"
+      onCerrar={onCerrar}
+    >
+      <div
+        className="cat-detalle-visual"
+        style={{
+          backgroundColor: obtenerColorProducto(producto.nombre),
+        }}
+      >
+        {producto.imagen_url}
+
+        <span className="cat-detalle-inicial" aria-hidden="true">
+          {obtenerIniciales(producto.nombre)}
+        </span>
+
+        <span className={`cat-estado cat-${estado}`}>
+          {obtenerTextoEstado(producto.stock)}
+        </span>
+      </div>
+
+      <div className="cat-detalle-stats">
+        <MetricaProducto
+          valor={formatearMonto(producto.precio)}
+          etiqueta="Precio"
+          destacada
+        />
+
+        <MetricaProducto
+          valor={formatearCantidad(producto.stock)}
+          etiqueta="Stock"
+          estado={estado}
+        />
+
+        <MetricaProducto
+          valor={formatearCantidad(producto.vendido)}
+          etiqueta="Vendidos"
+        />
+
+        <MetricaProducto
+          valor={formatearCantidad(producto.comprado)}
+          etiqueta="Comprados"
+        />
+      </div>
+
+      <div className="cat-detalle-informacion">
+        <div className="dato">
+          <span className="etiqueta">Costo en USD</span>
+          <span className="valor">
+            {producto.costo_usd !== ""
+              ? `USD ${formatearDecimal(producto.costo_usd)}`
+              : "No registrado"}
+          </span>
+        </div>
+
+        <div className="dato">
+          <span className="etiqueta">Lote</span>
+          <span className="valor">
+            {producto.lote_id
+              ? `Lote ${producto.lote_id}`
+              : "Sin lote"}
+          </span>
+        </div>
+      </div>
+
+      <div className="cat-detalle-acciones">
+        <button
+          type="button"
+          className="btn-principal"
+          onClick={onEditar}
+        >
+          Editar producto
+        </button>
+
+        <button
+          type="button"
+          className="btn-borrar"
+          onClick={onEliminar}
+          disabled={eliminando}
+        >
+          {eliminando ? "Eliminando..." : "Eliminar"}
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+function ModalFormularioProducto({
+  modo,
+  formulario,
+  lotes,
+  sugerencia,
+  guardando,
+  calculandoSugerencia,
+  formularioValido,
+  onCambiar,
+  onSugerencia,
+  onGuardar,
+  onCerrar,
+}) {
+  const esCreacion = modo === "crear"
+
+  return (
+    <Modal
+      titulo={esCreacion ? "Nuevo producto" : "Editar producto"}
+      etiqueta={esCreacion ? "Crear registro" : "Modificar registro"}
+      onCerrar={onCerrar}
+    >
+      <form
+        className="cat-form-edicion"
+        onSubmit={onGuardar}
+      >
+        <div className="campo">
+          <label htmlFor="producto-nombre">Nombre</label>
+
+          <input
+            id="producto-nombre"
+            type="text"
+            value={formulario.nombre}
+            onChange={(evento) =>
+              onCambiar("nombre", evento.target.value)
+            }
+            placeholder="Nombre del producto"
+            maxLength={150}
+            autoFocus
+            required
+          />
+        </div>
+
+        <div className="campo">
+          <label htmlFor="producto-imagen">
+            URL de imagen
+          </label>
+
+          <input
+            id="producto-imagen"
+            type="url"
+            value={formulario.imagenUrl}
+            onChange={(evento) =>
+              onCambiar("imagenUrl", evento.target.value)
+            }
+            placeholder="https://ejemplo.com/producto.jpg"
+          />
+
+          {formulario.imagenUrl.trim() && (
+            <div className="cat-preview-img">
+              {formulario.imagenUrl}
+            </div>
+          )}
+        </div>
+
+        <div className="grid-form-config">
+          <div className="campo">
+            <label htmlFor="producto-lote">Lote</label>
+
+            <select
+              id="producto-lote"
+              value={formulario.loteId}
+              onChange={(evento) =>
+                onCambiar("loteId", evento.target.value)
+              }
+            >
+              <option value="">Sin lote</option>
+
+              {lotes.map((lote) => (
+                <option key={lote.id} value={lote.id}>
+                  {formatearFecha(lote.fecha)} ·{" "}
+                  {lote.descripcion || `Lote ${lote.id}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="campo">
+            <label htmlFor="producto-costo">
+              Costo en USD
+            </label>
+
+            <input
+              id="producto-costo"
+              type="number"
+              min="0"
+              step="any"
+              value={formulario.costoUsd}
+              onChange={(evento) =>
+                onCambiar("costoUsd", evento.target.value)
+              }
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+
+        <div className="grid-form-config">
+          <div className="campo">
+            <label htmlFor="producto-cantidad">
+              Cantidad comprada
+            </label>
+
+            <input
+              id="producto-cantidad"
+              type="number"
+              min="0"
+              step="1"
+              value={formulario.cantidadComprada}
+              onChange={(evento) =>
+                onCambiar(
+                  "cantidadComprada",
+                  evento.target.value
+                )
+              }
+              placeholder="0"
+            />
+          </div>
+
+          <div className="campo campo-accion">
+            <span className="label-control">
+              Sugerencia de precio
+            </span>
+
+            <button
+              type="button"
+              className="btn-secundario btn-ancho-completo"
+              onClick={onSugerencia}
+              disabled={
+                calculandoSugerencia ||
+                !formulario.loteId ||
+                convertirNumero(formulario.costoUsd) <= 0
+              }
+            >
+              {calculandoSugerencia
+                ? "Calculando..."
+                : "Calcular sugerencia"}
+            </button>
+          </div>
+        </div>
+
+        {sugerencia && (
+          <div className="caja-sugerencia">
+            <div>
+              <span>Costo unitario</span>
+              <strong>
+                {formatearMonto(sugerencia.costo_unitario)}
+              </strong>
             </div>
 
-            {/* Imagen o visual */}
-            <div className="cat-detalle-visual" style={{ backgroundColor: colorProducto(productoAbierto.nombre) }}>
-              {productoAbierto.imagen_url ? (
-                <img
-                  src={productoAbierto.imagen_url}
-                  alt={productoAbierto.nombre}
-                  className="cat-detalle-img"
-                  onError={function (e) { e.target.style.display = "none" }}
-                />
-              ) : null}
-              <span className="cat-detalle-inicial">{inicialProducto(productoAbierto.nombre)}</span>
+            <div>
+              <span>Multiplicador</span>
+              <strong>{sugerencia.multiplicador}</strong>
             </div>
 
-            <div className="cat-detalle-stats">
-              <div className="stat">
-                <span className="stat-valor">{formatearMonto(productoAbierto.precio)}</span>
-                <span className="stat-etiqueta">Precio</span>
-              </div>
-              <div className="stat">
-                <span className="stat-valor">{productoAbierto.stock}</span>
-                <span className="stat-etiqueta">Stock</span>
-              </div>
-              <div className="stat">
-                <span className="stat-valor">{productoAbierto.vendido}</span>
-                <span className="stat-etiqueta">Vendidos</span>
-              </div>
-              <div className="stat">
-                <span className="stat-valor">{productoAbierto.comprado}</span>
-                <span className="stat-etiqueta">Comprados</span>
-              </div>
+            <div>
+              <span>Precio sugerido</span>
+              <strong>
+                {formatearMonto(sugerencia.precio_sugerido)}
+              </strong>
             </div>
+          </div>
+        )}
 
-            {productoAbierto.costo_usd && (
-              <p className="cat-detalle-costo">Costo: ${productoAbierto.costo_usd} USD</p>
+        <div className="campo cat-campo-precio">
+          <label htmlFor="producto-precio">Precio final</label>
+
+          <input
+            id="producto-precio"
+            type="number"
+            min="0.01"
+            step="any"
+            value={formulario.precio}
+            onChange={(evento) =>
+              onCambiar("precio", evento.target.value)
+            }
+            placeholder="0"
+            required
+          />
+        </div>
+
+        <div className="cat-form-acciones">
+          <button
+            type="button"
+            className="btn-secundario"
+            onClick={onCerrar}
+            disabled={guardando}
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="submit"
+            className="btn-principal"
+            disabled={!formularioValido || guardando}
+          >
+            {guardando
+              ? "Guardando..."
+              : esCreacion
+                ? "Crear producto"
+                : "Guardar cambios"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function Modal({ titulo, etiqueta, children, onCerrar }) {
+  return (
+    <div
+      className="modal-overlay"
+      onMouseDown={(evento) => {
+        if (evento.target === evento.currentTarget) {
+          onCerrar()
+        }
+      }}
+      role="presentation"
+    >
+      <div
+        className="modal-contenido cat-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-modal-producto"
+      >
+        <div className="modal-cabecera">
+          <div>
+            {etiqueta && (
+              <span className="modal-etiqueta">
+                {etiqueta}
+              </span>
             )}
 
-            <div className="cat-detalle-acciones">
-              <button className="btn-principal" onClick={function () { iniciarEdicion(productoAbierto) }}>Editar producto</button>
-              <button className="btn-borrar" onClick={function () { borrarProducto(productoAbierto.id) }}>Eliminar</button>
-            </div>
+            <h3 id="titulo-modal-producto">{titulo}</h3>
           </div>
+
+          <button
+            type="button"
+            className="btn-cerrar-modal"
+            onClick={onCerrar}
+            aria-label="Cerrar ventana"
+          >
+            ×
+          </button>
         </div>
-      )}
 
-      {/* ===== MODAL EDICIÓN / CREACIÓN ===== */}
-      {(modoEdicion || modoCrear) && (
-        <div className="modal-overlay" onClick={cerrarModal}>
-          <div className="modal-contenido cat-modal" onClick={function (e) { e.stopPropagation() }}>
-            <div className="modal-cabecera">
-              <h3>{modoCrear ? "Nuevo producto" : "Editar producto"}</h3>
-              <button className="btn-cerrar-modal" onClick={cerrarModal}>×</button>
-            </div>
-
-            <div className="cat-form-edicion">
-              <div className="campo">
-                <label>Nombre</label>
-                <input type="text" value={formNombre} onChange={function (e) { setFormNombre(e.target.value) }} placeholder="Nombre del producto" />
-              </div>
-
-              <div className="campo">
-                <label>Imagen URL (opcional)</label>
-                <input type="text" value={formImagenUrl} onChange={function (e) { setFormImagenUrl(e.target.value) }} placeholder="https://..." />
-                {formImagenUrl && (
-                  <div className="cat-preview-img">
-                    <img
-                      src={formImagenUrl}
-                      alt="Preview"
-                      onError={function (e) { e.target.style.display = "none" }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid-form-config">
-                <div className="campo">
-                  <label>Lote</label>
-                  <select value={formLote} onChange={function (e) { setFormLote(e.target.value) }}>
-                    <option value="">Seleccionar lote</option>
-                    {lotes.map(function (l) {
-                      return (
-                        <option key={l.id} value={l.id}>
-                          {l.fecha} — {l.descripcion || "Lote " + l.id}
-                        </option>
-                      )
-                    })}
-                  </select>
-                </div>
-                <div className="campo">
-                  <label>Costo USD</label>
-                  <input type="number" step="any" value={formCostoUsd} onChange={function (e) { setFormCostoUsd(e.target.value) }} placeholder="0.00" />
-                </div>
-              </div>
-
-              <div className="grid-form-config">
-                <div className="campo">
-                  <label>Cantidad comprada</label>
-                  <input type="number" value={formCantidad} onChange={function (e) { setFormCantidad(e.target.value) }} placeholder="0" />
-                </div>
-                <div className="campo">
-                  <label>&nbsp;</label>
-                  <button type="button" className="btn-secundario" onClick={pedirSugerencia} style={{ width: "100%" }}>Calcular sugerencia</button>
-                </div>
-              </div>
-
-              {sugerencia !== null && (
-                <div className="caja-sugerencia">
-                  <p>Costo unitario: <strong>{sugerencia.costo_unitario}</strong></p>
-                  <p>Multiplicador: <strong>{sugerencia.multiplicador}</strong></p>
-                  <p>Precio sugerido: <strong>{sugerencia.precio_sugerido}</strong></p>
-                </div>
-              )}
-
-              <div className="campo">
-                <label>Precio final</label>
-                <input type="number" value={formPrecio} onChange={function (e) { setFormPrecio(e.target.value) }} placeholder="0" />
-              </div>
-
-              <div className="fila-form">
-                <button className="btn-principal" onClick={guardarProducto}>
-                  {modoCrear ? "Crear producto" : "Guardar cambios"}
-                </button>
-                <button className="btn-secundario" onClick={cerrarModal}>Cancelar</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        {children}
+      </div>
     </div>
   )
+}
+
+function MetricaProducto({
+  valor,
+  etiqueta,
+  destacada = false,
+  estado = "",
+}) {
+  return (
+    <div
+      className={[
+        "stat",
+        destacada ? "stat-destacada" : "",
+        estado ? `stat-${estado}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <span className="stat-valor">{valor}</span>
+      <span className="stat-etiqueta">{etiqueta}</span>
+    </div>
+  )
+}
+
+function EstadoCatalogo({
+  titulo,
+  descripcion,
+  mostrarBoton,
+  onCrear,
+  onLimpiar,
+}) {
+  return (
+    <section className="cat-vacio">
+      <span className="cat-vacio-simbolo" aria-hidden="true">
+        +
+      </span>
+
+      <h2>{titulo}</h2>
+      <p>{descripcion}</p>
+
+      <button
+        type="button"
+        className={
+          mostrarBoton ? "btn-principal" : "btn-secundario"
+        }
+        onClick={mostrarBoton ? onCrear : onLimpiar}
+      >
+        {mostrarBoton ? "Crear producto" : "Limpiar filtros"}
+      </button>
+    </section>
+  )
+}
+
+function BotonFiltro({ activo, children, onClick }) {
+  return (
+    <button
+      type="button"
+      className={`btn-filtro ${activo ? "activo" : ""}`}
+      onClick={onClick}
+      aria-pressed={activo}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ImagenProducto({ src, alt, className = "" }) {
+  const [imagenFallida, setImagenFallida] = useState(false)
+
+  useEffect(() => {
+    setImagenFallida(false)
+  }, [src])
+
+  if (!src || imagenFallida) {
+    return null
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt || ""}
+      className={className}
+      loading="lazy"
+      onError={() => setImagenFallida(true)}
+    />
+  )
+}
+function obtenerEstadoStock(cantidad) {
+  const stock = convertirNumero(cantidad)
+
+  if (stock <= 0) return FILTROS_STOCK.AGOTADO
+  if (stock <= LIMITE_STOCK_BAJO) return FILTROS_STOCK.BAJO
+
+  return FILTROS_STOCK.DISPONIBLE
+}
+
+function obtenerTextoEstado(cantidad) {
+  const stock = convertirNumero(cantidad)
+
+  if (stock <= 0) return "Agotado"
+  if (stock <= LIMITE_STOCK_BAJO) return `${stock} · Bajo`
+
+  return `${stock} unidades`
+}
+
+function ordenarProductos(a, b, orden) {
+  if (orden === ORDENES.PRECIO_ASC) {
+    return a.precio - b.precio
+  }
+
+  if (orden === ORDENES.PRECIO_DESC) {
+    return b.precio - a.precio
+  }
+
+  if (orden === ORDENES.STOCK_ASC) {
+    return a.stock - b.stock
+  }
+
+  if (orden === ORDENES.STOCK_DESC) {
+    return b.stock - a.stock
+  }
+
+  return a.nombre.localeCompare(b.nombre, "es", {
+    sensitivity: "base",
+  })
+}
+
+function normalizarTexto(valor = "") {
+  return String(valor)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+}
+
+function convertirNumero(valor, predeterminado = 0) {
+  const numero = Number(valor)
+
+  return Number.isFinite(numero) ? numero : predeterminado
+}
+
+function valorParaInput(valor) {
+  return valor === null || valor === undefined ? "" : String(valor)
+}
+
+function formatearMonto(valor) {
+  return FORMATEADOR_MONTO.format(convertirNumero(valor))
+}
+
+function formatearDecimal(valor) {
+  return FORMATEADOR_DECIMAL.format(convertirNumero(valor))
+}
+
+function formatearCantidad(valor) {
+  return FORMATEADOR_MONTO.format(convertirNumero(valor))
+}
+
+function formatearFecha(fecha) {
+  if (!fecha) return "Sin fecha"
+
+  const [anio, mes, dia] = String(fecha)
+    .split("T")[0]
+    .split("-")
+    .map(Number)
+
+  if (!anio || !mes || !dia) return String(fecha)
+
+  return new Date(anio, mes - 1, dia).toLocaleDateString(
+    "es-PY",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }
+  )
+}
+
+function obtenerIniciales(nombre) {
+  const palabras = String(nombre)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (palabras.length === 0) return "?"
+
+  if (palabras.length === 1) {
+    return palabras[0].slice(0, 2).toUpperCase()
+  }
+
+  return `${palabras[0][0]}${palabras[1][0]}`.toUpperCase()
+}
+
+function obtenerColorProducto(nombre) {
+  const colores = [
+    "#171316",
+    "#181317",
+    "#151419",
+    "#191515",
+    "#141718",
+    "#191318",
+  ]
+
+  let hash = 0
+
+  for (let indice = 0; indice < nombre.length; indice += 1) {
+    hash =
+      nombre.charCodeAt(indice) +
+      ((hash << 5) - hash)
+  }
+
+  return colores[Math.abs(hash) % colores.length]
+}
+
+function esUrlValida(valor) {
+  try {
+    const url = new URL(valor)
+
+    return url.protocol === "http:" || url.protocol === "https:"
+  } catch {
+    return false
+  }
 }
 
 export default Catalogo

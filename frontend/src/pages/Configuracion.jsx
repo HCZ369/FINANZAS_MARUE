@@ -1,396 +1,521 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { apiGet, apiPost, apiPut, apiDelete } from "../api/client"
 
+// =============================================
+// Estados iniciales de formularios
+// =============================================
+const FORM_INICIAL = {
+  negocio: { nombre: "" },
+  categoria: { nombre: "", tipo: "gasto" },
+  inyeccion: { monto: "", fecha: "", nota: "" },
+  lote: { fecha: "", tasa_cambio: "", descripcion: "" },
+  producto: {
+    nombre: "",
+    precio: "",
+    lote_id: "",
+    costo_usd: "",
+    cantidad_comprada: "",
+  },
+}
+
 function Configuracion({ negocioId }) {
-  const [negocios, setNegocios] = useState([])
-  const [categorias, setCategorias] = useState([])
-  const [inyecciones, setInyecciones] = useState([])
-  const [productos, setProductos] = useState([])
-  const [lotes, setLotes] = useState([])
+  // Datos
+  const [datos, setDatos] = useState({
+    negocios: [],
+    categorias: [],
+    inyecciones: [],
+    productos: [],
+    lotes: [],
+  })
 
-  // Negocio
-  const [nombreNegocio, setNombreNegocio] = useState("")
-  const [editandoNegocioId, setEditandoNegocioId] = useState(null)
+  // Formularios (uno por sección)
+  const [forms, setForms] = useState(FORM_INICIAL)
 
-  // Categoría
-  const [nombreCategoria, setNombreCategoria] = useState("")
-  const [tipoCategoria, setTipoCategoria] = useState("gasto")
-  const [editandoCategoriaId, setEditandoCategoriaId] = useState(null)
+  // IDs en edición
+  const [editandoId, setEditandoId] = useState({
+    negocio: null,
+    categoria: null,
+    inyeccion: null,
+    lote: null,
+    producto: null,
+  })
 
-  // Inyección
-  const [montoInyeccion, setMontoInyeccion] = useState("")
-  const [fechaInyeccion, setFechaInyeccion] = useState("")
-  const [notaInyeccion, setNotaInyeccion] = useState("")
-  const [editandoInyeccionId, setEditandoInyeccionId] = useState(null)
-
-  // Lote
-  const [fechaLote, setFechaLote] = useState("")
-  const [tasaCambio, setTasaCambio] = useState("")
-  const [descripcionLote, setDescripcionLote] = useState("")
-  const [editandoLoteId, setEditandoLoteId] = useState(null)
-
-  // Producto
-  const [nombreProducto, setNombreProducto] = useState("")
-  const [precioProducto, setPrecioProducto] = useState("")
-  const [loteProducto, setLoteProducto] = useState("")
-  const [costoUsdProducto, setCostoUsdProducto] = useState("")
-  const [cantidadProducto, setCantidadProducto] = useState("")
+  // Estados de UI / carga
+  const [cargando, setCargando] = useState(true)
+  const [guardando, setGuardando] = useState(null) // sección que está guardando
+  const [eliminando, setEliminando] = useState(null) // id que se está eliminando
   const [sugerencia, setSugerencia] = useState(null)
-  const [editandoProductoId, setEditandoProductoId] = useState(null)
+  const [mensaje, setMensaje] = useState({ texto: "", tipo: "exito" })
 
-  // UI
-  const [mensaje, setMensaje] = useState("")
-  const [tipoMensaje, setTipoMensaje] = useState("exito")
+  // Secciones colapsables (todas abiertas por defecto)
+  const [abiertas, setAbiertas] = useState({
+    negocios: true,
+    categorias: true,
+    inyecciones: true,
+    lotes: true,
+    productos: true,
+  })
 
-  useEffect(() => {
-    cargarDatos()
-  }, [negocioId])
-
-  async function cargarDatos() {
-    try {
-      setNegocios(await apiGet("/negocios/"))
-      setCategorias(await apiGet(`/negocios/${negocioId}/categorias/`))
-      setInyecciones(await apiGet(`/negocios/${negocioId}/inyecciones/`))
-      setProductos(await apiGet(`/negocios/${negocioId}/productos/`))
-      setLotes(await apiGet(`/negocios/${negocioId}/lotes/`))
-    } catch (error) {
-      mostrarMsg("Error cargando datos: " + error.message, "error")
-    }
-  }
-
-  function mostrarMsg(texto, tipo) {
-    setMensaje(texto)
-    setTipoMensaje(tipo || "exito")
+  // =============================================
+  // Helpers
+  // =============================================
+  const mostrarMsg = useCallback((texto, tipo = "exito") => {
+    setMensaje({ texto, tipo })
     if (tipo !== "error") {
-      setTimeout(() => setMensaje(""), 4000)
+      setTimeout(() => setMensaje({ texto: "", tipo: "exito" }), 4000)
     }
-  }
+  }, [])
 
   function formatearMonto(valor) {
     return Number(valor).toLocaleString("es-PY")
   }
 
+  function actualizarForm(seccion, campos) {
+    setForms((prev) => ({ ...prev, [seccion]: { ...prev[seccion], ...campos } }))
+  }
+
+  function resetForm(seccion) {
+    setForms((prev) => ({ ...prev, [seccion]: FORM_INICIAL[seccion] }))
+    setEditandoId((prev) => ({ ...prev, [seccion]: null }))
+    if (seccion === "producto") setSugerencia(null)
+  }
+
+  function toggleSeccion(seccion) {
+    setAbiertas((prev) => ({ ...prev, [seccion]: !prev[seccion] }))
+  }
+
+  // =============================================
+  // Carga de datos (paralela)
+  // =============================================
+  const cargarDatos = useCallback(async () => {
+    setCargando(true)
+    try {
+      const [negocios, categorias, inyecciones, productos, lotes] = await Promise.all([
+        apiGet("/negocios/"),
+        apiGet(`/negocios/${negocioId}/categorias/`),
+        apiGet(`/negocios/${negocioId}/inyecciones/`),
+        apiGet(`/negocios/${negocioId}/productos/`),
+        apiGet(`/negocios/${negocioId}/lotes/`),
+      ])
+      setDatos({ negocios, categorias, inyecciones, productos, lotes })
+    } catch (error) {
+      mostrarMsg("Error cargando datos: " + error.message, "error")
+    } finally {
+      setCargando(false)
+    }
+  }, [negocioId, mostrarMsg])
+
+  useEffect(() => {
+    cargarDatos()
+  }, [cargarDatos])
+
+  // =============================================
+  // CRUD genérico
+  // seccion: clave del form ("negocio", "categoria", ...)
+  // coleccion: clave en `datos` ("negocios", "categorias", ...)
+  // urlBase: URL sin ID (para POST). PUT/DELETE agregan `${id}/`
+  // validar: fn(form) => string|null (null si es válido)
+  // nombreItem: fn(item) => texto para mensajes
+  // =============================================
+  async function guardar({ seccion, coleccion, urlBase, validar, datosPayload }) {
+    const form = forms[seccion]
+    const id = editandoId[seccion]
+
+    const error = validar ? validar(form) : null
+    if (error) {
+      mostrarMsg(error, "error")
+      return
+    }
+
+    setGuardando(seccion)
+    try {
+      const payload = datosPayload ? datosPayload(form) : form
+      const resultado = id
+        ? await apiPut(`${urlBase}${id}/`, payload)
+        : await apiPost(urlBase, payload)
+
+      // Actualizar estado local sin recargar todo
+      setDatos((prev) => {
+        const lista = prev[coleccion]
+        if (id) {
+          // Editar: reemplazar el ítem
+          const item = resultado.item ?? resultado.data ?? { ...form, id }
+          return {
+            ...prev,
+            [coleccion]: lista.map((x) => (x.id === id ? { ...x, ...item } : x)),
+          }
+        }
+        // Crear: si el backend devuelve el item, agregarlo; si no, recargar
+        const nuevo = resultado.item ?? resultado.data
+        if (nuevo && nuevo.id) {
+          return { ...prev, [coleccion]: [...lista, nuevo] }
+        }
+        return prev
+      })
+
+      mostrarMsg(resultado.mensaje || "Guardado correctamente")
+      resetForm(seccion)
+
+      // Si el backend no devolvió el item nuevo, recargamos como fallback
+      if (!id && !(resultado.item || resultado.data)) {
+        await cargarDatos()
+      }
+    } catch (error) {
+      mostrarMsg("Error: " + error.message, "error")
+    } finally {
+      setGuardando(null)
+    }
+  }
+
+  async function borrar({ coleccion, urlBase, id, nombre }) {
+    if (!confirm(`¿Eliminar "${nombre}"?`)) return
+    setEliminando(id)
+    try {
+      const resultado = await apiDelete(`${urlBase}${id}/`)
+      setDatos((prev) => ({
+        ...prev,
+        [coleccion]: prev[coleccion].filter((x) => x.id !== id),
+      }))
+      mostrarMsg(resultado.mensaje || `"${nombre}" eliminado`)
+    } catch (error) {
+      mostrarMsg("Error: " + error.message, "error")
+    } finally {
+      setEliminando(null)
+    }
+  }
+
   // =============================================
   // NEGOCIOS
   // =============================================
-  async function guardarNegocio(evento) {
-    evento.preventDefault()
-    try {
-      const datos = { nombre: nombreNegocio }
-      const resultado = editandoNegocioId
-        ? await apiPut(`/negocios/${editandoNegocioId}/`, datos)
-        : await apiPost("/negocios/", datos)
-      mostrarMsg(resultado.mensaje)
-      setNombreNegocio("")
-      setEditandoNegocioId(null)
-      await cargarDatos()
-    } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
-    }
+  function guardarNegocio(e) {
+    e.preventDefault()
+    guardar({
+      seccion: "negocio",
+      coleccion: "negocios",
+      urlBase: "/negocios/",
+      validar: (f) => (!f.nombre.trim() ? "El nombre del negocio es obligatorio" : null),
+    })
   }
 
   function editarNegocio(n) {
-    setEditandoNegocioId(n.id)
-    setNombreNegocio(n.nombre)
+    actualizarForm("negocio", { nombre: n.nombre })
+    setEditandoId((p) => ({ ...p, negocio: n.id }))
   }
 
-  async function borrarNegocio(id) {
-    if (!confirm("¿Eliminar este negocio? Se perderán todos sus datos.")) {
-      return
-    }
-    try {
-      const resultado = await apiDelete(`/negocios/${id}/`)
-      mostrarMsg(resultado.mensaje)
-      await cargarDatos()
-    } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
-    }
+  function borrarNegocio(n) {
+    borrar({
+      coleccion: "negocios",
+      urlBase: "/negocios/",
+      id: n.id,
+      nombre: `${n.nombre} (se perderán todos sus datos)`,
+    })
   }
 
   // =============================================
   // CATEGORÍAS
   // =============================================
-  async function guardarCategoria(evento) {
-    evento.preventDefault()
-    try {
-      const datos = { nombre: nombreCategoria, tipo: tipoCategoria }
-      const resultado = editandoCategoriaId
-        ? await apiPut(`/negocios/${negocioId}/categorias/${editandoCategoriaId}/`, datos)
-        : await apiPost(`/negocios/${negocioId}/categorias/`, datos)
-      mostrarMsg(resultado.mensaje)
-      setNombreCategoria("")
-      setEditandoCategoriaId(null)
-      await cargarDatos()
-    } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
-    }
+  function guardarCategoria(e) {
+    e.preventDefault()
+    guardar({
+      seccion: "categoria",
+      coleccion: "categorias",
+      urlBase: `/negocios/${negocioId}/categorias/`,
+      validar: (f) => {
+        if (!f.nombre.trim()) return "El nombre de la categoría es obligatorio"
+        if (!["gasto", "ingreso"].includes(f.tipo)) return "Tipo de categoría inválido"
+        return null
+      },
+    })
   }
 
   function editarCategoria(c) {
-    setEditandoCategoriaId(c.id)
-    setNombreCategoria(c.nombre)
-    setTipoCategoria(c.tipo)
+    actualizarForm("categoria", { nombre: c.nombre, tipo: c.tipo })
+    setEditandoId((p) => ({ ...p, categoria: c.id }))
   }
 
-  async function borrarCategoria(id) {
-    if (!confirm("¿Eliminar esta categoría?")) {
-      return
-    }
-    try {
-      const resultado = await apiDelete(`/negocios/${negocioId}/categorias/${id}/`)
-      mostrarMsg(resultado.mensaje)
-      await cargarDatos()
-    } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
-    }
+  function borrarCategoria(c) {
+    borrar({
+      coleccion: "categorias",
+      urlBase: `/negocios/${negocioId}/categorias/`,
+      id: c.id,
+      nombre: c.nombre,
+    })
   }
 
   // =============================================
   // INYECCIONES
   // =============================================
-  async function guardarInyeccion(evento) {
-    evento.preventDefault()
-    try {
-      const datos = { monto: montoInyeccion, fecha: fechaInyeccion, nota: notaInyeccion }
-      const resultado = editandoInyeccionId
-        ? await apiPut(`/negocios/${negocioId}/inyecciones/${editandoInyeccionId}/`, datos)
-        : await apiPost(`/negocios/${negocioId}/inyecciones/`, datos)
-      mostrarMsg(resultado.mensaje)
-      setMontoInyeccion("")
-      setFechaInyeccion("")
-      setNotaInyeccion("")
-      setEditandoInyeccionId(null)
-      await cargarDatos()
-    } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
-    }
+  function guardarInyeccion(e) {
+    e.preventDefault()
+    guardar({
+      seccion: "inyeccion",
+      coleccion: "inyecciones",
+      urlBase: `/negocios/${negocioId}/inyecciones/`,
+      validar: (f) => {
+        if (!f.monto || Number(f.monto) <= 0) return "El monto debe ser mayor a 0"
+        if (!f.fecha) return "La fecha es obligatoria"
+        return null
+      },
+    })
   }
 
   function editarInyeccion(i) {
-    setEditandoInyeccionId(i.id)
-    setMontoInyeccion(i.monto)
-    setFechaInyeccion(i.fecha)
-    setNotaInyeccion(i.nota || "")
+    actualizarForm("inyeccion", { monto: i.monto, fecha: i.fecha, nota: i.nota || "" })
+    setEditandoId((p) => ({ ...p, inyeccion: i.id }))
   }
 
-  async function borrarInyeccion(id) {
-    if (!confirm("¿Eliminar esta inyección?")) {
-      return
-    }
-    try {
-      const resultado = await apiDelete(`/negocios/${negocioId}/inyecciones/${id}/`)
-      mostrarMsg(resultado.mensaje)
-      await cargarDatos()
-    } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
-    }
+  function borrarInyeccion(i) {
+    borrar({
+      coleccion: "inyecciones",
+      urlBase: `/negocios/${negocioId}/inyecciones/`,
+      id: i.id,
+      nombre: `inyección de ${formatearMonto(i.monto)} del ${i.fecha}`,
+    })
   }
 
   // =============================================
   // LOTES
   // =============================================
-  async function guardarLote(evento) {
-    evento.preventDefault()
-    try {
-      const datos = { fecha: fechaLote, tasa_cambio: tasaCambio, descripcion: descripcionLote }
-      const resultado = editandoLoteId
-        ? await apiPut(`/negocios/${negocioId}/lotes/${editandoLoteId}/`, datos)
-        : await apiPost(`/negocios/${negocioId}/lotes/`, datos)
-      mostrarMsg(resultado.mensaje)
-      setFechaLote("")
-      setTasaCambio("")
-      setDescripcionLote("")
-      setEditandoLoteId(null)
-      await cargarDatos()
-    } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
-    }
+  function guardarLote(e) {
+    e.preventDefault()
+    guardar({
+      seccion: "lote",
+      coleccion: "lotes",
+      urlBase: `/negocios/${negocioId}/lotes/`,
+      validar: (f) => {
+        if (!f.fecha) return "La fecha del lote es obligatoria"
+        if (!f.tasa_cambio || Number(f.tasa_cambio) <= 0) return "La tasa de cambio debe ser mayor a 0"
+        return null
+      },
+    })
   }
 
   function editarLote(l) {
-    setEditandoLoteId(l.id)
-    setFechaLote(l.fecha)
-    setTasaCambio(l.tasa_cambio)
-    setDescripcionLote(l.descripcion || "")
+    actualizarForm("lote", {
+      fecha: l.fecha,
+      tasa_cambio: l.tasa_cambio,
+      descripcion: l.descripcion || "",
+    })
+    setEditandoId((p) => ({ ...p, lote: l.id }))
   }
 
-  async function borrarLote(id) {
-    if (!confirm("¿Eliminar este lote?")) {
-      return
-    }
-    try {
-      const resultado = await apiDelete(`/negocios/${negocioId}/lotes/${id}/`)
-      mostrarMsg(resultado.mensaje)
-      await cargarDatos()
-    } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
-    }
+  function borrarLote(l) {
+    borrar({
+      coleccion: "lotes",
+      urlBase: `/negocios/${negocioId}/lotes/`,
+      id: l.id,
+      nombre: l.descripcion || `Lote del ${l.fecha}`,
+    })
   }
 
   // =============================================
   // PRODUCTOS
   // =============================================
-  async function guardarProducto(evento) {
-    evento.preventDefault()
-    try {
-      let costoUnitario = null
-      if (sugerencia !== null) {
-        costoUnitario = sugerencia.costo_unitario
-      }
-      const datos = {
-        nombre: nombreProducto,
-        precio: precioProducto,
-        costo: costoUnitario,
-        lote_id: loteProducto,
-        costo_usd: costoUsdProducto,
-        cantidad_comprada: cantidadProducto,
-      }
-      const resultado = editandoProductoId
-        ? await apiPut(`/negocios/${negocioId}/productos/${editandoProductoId}/`, datos)
-        : await apiPost(`/negocios/${negocioId}/productos/`, datos)
-      mostrarMsg(resultado.mensaje)
-      limpiarFormProducto()
-      await cargarDatos()
-    } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
-    }
-  }
-
-  function limpiarFormProducto() {
-    setNombreProducto("")
-    setPrecioProducto("")
-    setLoteProducto("")
-    setCostoUsdProducto("")
-    setCantidadProducto("")
-    setSugerencia(null)
-    setEditandoProductoId(null)
+  function guardarProducto(e) {
+    e.preventDefault()
+    guardar({
+      seccion: "producto",
+      coleccion: "productos",
+      urlBase: `/negocios/${negocioId}/productos/`,
+      validar: (f) => {
+        if (!f.nombre.trim()) return "El nombre del producto es obligatorio"
+        if (!f.precio || Number(f.precio) <= 0) return "El precio debe ser mayor a 0"
+        if (!f.lote_id) return "Elegí un lote"
+        if (!f.costo_usd || Number(f.costo_usd) <= 0) return "El costo USD debe ser mayor a 0"
+        if (!f.cantidad_comprada || Number(f.cantidad_comprada) <= 0)
+          return "La cantidad comprada debe ser mayor a 0"
+        return null
+      },
+      datosPayload: (f) => ({
+        nombre: f.nombre,
+        precio: f.precio,
+        costo: sugerencia?.costo_unitario ?? null,
+        lote_id: f.lote_id,
+        costo_usd: f.costo_usd,
+        cantidad_comprada: f.cantidad_comprada,
+      }),
+    })
   }
 
   function editarProducto(p) {
-    setEditandoProductoId(p.id)
-    setNombreProducto(p.nombre)
-    setPrecioProducto(p.precio)
-    setLoteProducto(p.lote_id || "")
-    setCostoUsdProducto(p.costo_usd || "")
-    setCantidadProducto(p.cantidad_comprada || "")
+    actualizarForm("producto", {
+      nombre: p.nombre,
+      precio: p.precio,
+      lote_id: p.lote_id || "",
+      costo_usd: p.costo_usd || "",
+      cantidad_comprada: p.cantidad_comprada || "",
+    })
+    setEditandoId((prev) => ({ ...prev, producto: p.id }))
     setSugerencia(null)
   }
 
-  async function borrarProducto(id) {
-    if (!confirm("¿Eliminar este producto?")) {
-      return
-    }
-    try {
-      const resultado = await apiDelete(`/negocios/${negocioId}/productos/${id}/`)
-      mostrarMsg(resultado.mensaje)
-      await cargarDatos()
-    } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
-    }
+  function borrarProducto(p) {
+    borrar({
+      coleccion: "productos",
+      urlBase: `/negocios/${negocioId}/productos/`,
+      id: p.id,
+      nombre: p.nombre,
+    })
   }
 
   async function pedirSugerencia() {
-    if (loteProducto === "" || costoUsdProducto === "") {
+    const f = forms.producto
+    if (!f.lote_id || !f.costo_usd) {
       mostrarMsg("Elegí un lote y cargá el costo USD para calcular la sugerencia", "error")
       return
     }
     try {
-      const datos = { lote_id: loteProducto, costo_usd: costoUsdProducto }
-      const resultado = await apiPost(`/negocios/${negocioId}/sugerencia-precio/`, datos)
+      const resultado = await apiPost(`/negocios/${negocioId}/sugerencia-precio/`, {
+        lote_id: f.lote_id,
+        costo_usd: f.costo_usd,
+      })
       setSugerencia(resultado)
-      setPrecioProducto(resultado.precio_sugerido)
+      actualizarForm("producto", { precio: resultado.precio_sugerido })
     } catch (error) {
       mostrarMsg("Error calculando sugerencia: " + error.message, "error")
     }
+  }
+
+  // =============================================
+  // Subcomponente: tarjeta colapsable
+  // =============================================
+  function Tarjeta({ id, titulo, children }) {
+    const abierta = abiertas[id]
+    return (
+      <section className={`tarjeta-config ${abierta ? "abierta" : "cerrada"}`}>
+        <header className="tarjeta-header" onClick={() => toggleSeccion(id)}>
+          <h2>{titulo}</h2>
+          <button type="button" className="btn-toggle" aria-label={abierta ? "Colapsar" : "Expandir"}>
+            {abierta ? "▲" : "▼"}
+          </button>
+        </header>
+        {abierta && <div className="tarjeta-body">{children}</div>}
+      </section>
+    )
+  }
+
+  // =============================================
+  // Render
+  // =============================================
+  const formN = forms.negocio
+  const formC = forms.categoria
+  const formI = forms.inyeccion
+  const formL = forms.lote
+  const formP = forms.producto
+
+  if (cargando) {
+    return (
+      <div>
+        <h1>Configuración</h1>
+        <p className="lista-vacia">Cargando datos...</p>
+      </div>
+    )
   }
 
   return (
     <div>
       <h1>Configuración</h1>
 
-      {mensaje && (
-        <div className={tipoMensaje === "error" ? "msg msg-error" : "msg msg-exito"}>
-          {mensaje}
-          <button className="btn-cerrar-msg" onClick={() => setMensaje("")}>×</button>
+      {mensaje.texto && (
+        <div className={mensaje.tipo === "error" ? "msg msg-error" : "msg msg-exito"}>
+          {mensaje.texto}
+          <button className="btn-cerrar-msg" onClick={() => setMensaje({ texto: "", tipo: "exito" })}>×</button>
         </div>
       )}
 
       {/* NEGOCIOS */}
-      <section>
-        <h2>Negocios</h2>
+      <Tarjeta id="negocios" titulo="Negocios">
         <form onSubmit={guardarNegocio}>
           <input
             type="text"
             placeholder="Nombre del negocio"
-            value={nombreNegocio}
-            onChange={(e) => setNombreNegocio(e.target.value)}
+            value={formN.nombre}
+            onChange={(e) => actualizarForm("negocio", { nombre: e.target.value })}
           />
           <div className="fila-form">
-            <button type="submit" className="btn-principal">
-              {editandoNegocioId ? "Guardar" : "Crear negocio"}
+            <button type="submit" className="btn-principal" disabled={guardando === "negocio"}>
+              {guardando === "negocio"
+                ? "Guardando..."
+                : editandoId.negocio ? "Guardar" : "Crear negocio"}
             </button>
-            {editandoNegocioId && (
-              <button type="button" className="btn-secundario" onClick={() => { setEditandoNegocioId(null); setNombreNegocio("") }}>
+            {editandoId.negocio && (
+              <button type="button" className="btn-secundario" onClick={() => resetForm("negocio")}>
                 Cancelar
               </button>
             )}
           </div>
         </form>
         <div className="lista-items">
-          {negocios.map((n) => (
+          {datos.negocios.map((n) => (
             <div className="fila-item" key={n.id}>
               <span>{n.nombre}</span>
               <div className="acciones">
                 <button className="btn-accion" onClick={() => editarNegocio(n)}>Editar</button>
-                <button className="btn-borrar" onClick={() => borrarNegocio(n.id)}>Borrar</button>
+                <button
+                  className="btn-borrar"
+                  onClick={() => borrarNegocio(n)}
+                  disabled={eliminando === n.id}
+                >
+                  {eliminando === n.id ? "Borrando..." : "Borrar"}
+                </button>
               </div>
             </div>
           ))}
+          {datos.negocios.length === 0 && <p className="lista-vacia">Sin negocios</p>}
         </div>
-      </section>
+      </Tarjeta>
 
       {/* CATEGORÍAS */}
-      <section>
-        <h2>Categorías</h2>
+      <Tarjeta id="categorias" titulo="Categorías">
         <form onSubmit={guardarCategoria}>
           <input
             type="text"
             placeholder="Nombre de la categoría"
-            value={nombreCategoria}
-            onChange={(e) => setNombreCategoria(e.target.value)}
+            value={formC.nombre}
+            onChange={(e) => actualizarForm("categoria", { nombre: e.target.value })}
           />
-          <select value={tipoCategoria} onChange={(e) => setTipoCategoria(e.target.value)}>
+          <select
+            value={formC.tipo}
+            onChange={(e) => actualizarForm("categoria", { tipo: e.target.value })}
+          >
             <option value="gasto">Gasto</option>
             <option value="ingreso">Ingreso</option>
           </select>
           <div className="fila-form">
-            <button type="submit" className="btn-principal">
-              {editandoCategoriaId ? "Guardar" : "Crear categoría"}
+            <button type="submit" className="btn-principal" disabled={guardando === "categoria"}>
+              {guardando === "categoria"
+                ? "Guardando..."
+                : editandoId.categoria ? "Guardar" : "Crear categoría"}
             </button>
-            {editandoCategoriaId && (
-              <button type="button" className="btn-secundario" onClick={() => { setEditandoCategoriaId(null); setNombreCategoria("") }}>
+            {editandoId.categoria && (
+              <button type="button" className="btn-secundario" onClick={() => resetForm("categoria")}>
                 Cancelar
               </button>
             )}
           </div>
         </form>
         <div className="lista-items">
-          {categorias.map((c) => (
+          {datos.categorias.map((c) => (
             <div className="fila-item" key={c.id}>
               <span>{c.nombre} <span className="etiqueta-tipo">({c.tipo})</span></span>
               <div className="acciones">
                 <button className="btn-accion" onClick={() => editarCategoria(c)}>Editar</button>
-                <button className="btn-borrar" onClick={() => borrarCategoria(c.id)}>Borrar</button>
+                <button
+                  className="btn-borrar"
+                  onClick={() => borrarCategoria(c)}
+                  disabled={eliminando === c.id}
+                >
+                  {eliminando === c.id ? "Borrando..." : "Borrar"}
+                </button>
               </div>
             </div>
           ))}
-          {categorias.length === 0 && <p className="lista-vacia">Sin categorías</p>}
+          {datos.categorias.length === 0 && <p className="lista-vacia">Sin categorías</p>}
         </div>
-      </section>
+      </Tarjeta>
 
       {/* INYECCIONES */}
-      <section>
-        <h2>Inyecciones de capital</h2>
+      <Tarjeta id="inyecciones" titulo="Inyecciones de capital">
         <form onSubmit={guardarInyeccion}>
           <div className="grid-form-config">
             <div className="campo">
@@ -398,16 +523,16 @@ function Configuracion({ negocioId }) {
               <input
                 type="number"
                 placeholder="0"
-                value={montoInyeccion}
-                onChange={(e) => setMontoInyeccion(e.target.value)}
+                value={formI.monto}
+                onChange={(e) => actualizarForm("inyeccion", { monto: e.target.value })}
               />
             </div>
             <div className="campo">
               <label>Fecha</label>
               <input
                 type="date"
-                value={fechaInyeccion}
-                onChange={(e) => setFechaInyeccion(e.target.value)}
+                value={formI.fecha}
+                onChange={(e) => actualizarForm("inyeccion", { fecha: e.target.value })}
               />
             </div>
           </div>
@@ -416,23 +541,25 @@ function Configuracion({ negocioId }) {
             <input
               type="text"
               placeholder="Ej: compra de lote mayo"
-              value={notaInyeccion}
-              onChange={(e) => setNotaInyeccion(e.target.value)}
+              value={formI.nota}
+              onChange={(e) => actualizarForm("inyeccion", { nota: e.target.value })}
             />
           </div>
           <div className="fila-form">
-            <button type="submit" className="btn-principal">
-              {editandoInyeccionId ? "Guardar" : "Registrar inyección"}
+            <button type="submit" className="btn-principal" disabled={guardando === "inyeccion"}>
+              {guardando === "inyeccion"
+                ? "Guardando..."
+                : editandoId.inyeccion ? "Guardar" : "Registrar inyección"}
             </button>
-            {editandoInyeccionId && (
-              <button type="button" className="btn-secundario" onClick={() => { setEditandoInyeccionId(null); setMontoInyeccion(""); setFechaInyeccion(""); setNotaInyeccion("") }}>
+            {editandoId.inyeccion && (
+              <button type="button" className="btn-secundario" onClick={() => resetForm("inyeccion")}>
                 Cancelar
               </button>
             )}
           </div>
         </form>
         <div className="lista-items">
-          {inyecciones.map((i) => (
+          {datos.inyecciones.map((i) => (
             <div className="fila-item" key={i.id}>
               <span>
                 <strong>{formatearMonto(i.monto)}</strong> — {i.fecha}
@@ -440,25 +567,30 @@ function Configuracion({ negocioId }) {
               </span>
               <div className="acciones">
                 <button className="btn-accion" onClick={() => editarInyeccion(i)}>Editar</button>
-                <button className="btn-borrar" onClick={() => borrarInyeccion(i.id)}>Borrar</button>
+                <button
+                  className="btn-borrar"
+                  onClick={() => borrarInyeccion(i)}
+                  disabled={eliminando === i.id}
+                >
+                  {eliminando === i.id ? "Borrando..." : "Borrar"}
+                </button>
               </div>
             </div>
           ))}
-          {inyecciones.length === 0 && <p className="lista-vacia">Sin inyecciones</p>}
+          {datos.inyecciones.length === 0 && <p className="lista-vacia">Sin inyecciones</p>}
         </div>
-      </section>
+      </Tarjeta>
 
       {/* LOTES */}
-      <section>
-        <h2>Lotes de compra</h2>
+      <Tarjeta id="lotes" titulo="Lotes de compra">
         <form onSubmit={guardarLote}>
           <div className="grid-form-config">
             <div className="campo">
               <label>Fecha</label>
               <input
                 type="date"
-                value={fechaLote}
-                onChange={(e) => setFechaLote(e.target.value)}
+                value={formL.fecha}
+                onChange={(e) => actualizarForm("lote", { fecha: e.target.value })}
               />
             </div>
             <div className="campo">
@@ -466,8 +598,8 @@ function Configuracion({ negocioId }) {
               <input
                 type="number"
                 placeholder="Ej: 7350"
-                value={tasaCambio}
-                onChange={(e) => setTasaCambio(e.target.value)}
+                value={formL.tasa_cambio}
+                onChange={(e) => actualizarForm("lote", { tasa_cambio: e.target.value })}
               />
             </div>
           </div>
@@ -476,23 +608,25 @@ function Configuracion({ negocioId }) {
             <input
               type="text"
               placeholder="Ej: Lote AliExpress mayo"
-              value={descripcionLote}
-              onChange={(e) => setDescripcionLote(e.target.value)}
+              value={formL.descripcion}
+              onChange={(e) => actualizarForm("lote", { descripcion: e.target.value })}
             />
           </div>
           <div className="fila-form">
-            <button type="submit" className="btn-principal">
-              {editandoLoteId ? "Guardar" : "Crear lote"}
+            <button type="submit" className="btn-principal" disabled={guardando === "lote"}>
+              {guardando === "lote"
+                ? "Guardando..."
+                : editandoId.lote ? "Guardar" : "Crear lote"}
             </button>
-            {editandoLoteId && (
-              <button type="button" className="btn-secundario" onClick={() => { setEditandoLoteId(null); setFechaLote(""); setTasaCambio(""); setDescripcionLote("") }}>
+            {editandoId.lote && (
+              <button type="button" className="btn-secundario" onClick={() => resetForm("lote")}>
                 Cancelar
               </button>
             )}
           </div>
         </form>
         <div className="lista-items">
-          {lotes.map((l) => (
+          {datos.lotes.map((l) => (
             <div className="fila-item" key={l.id}>
               <span>
                 {l.fecha} — Tasa <strong>{formatearMonto(l.tasa_cambio)}</strong>
@@ -500,33 +634,41 @@ function Configuracion({ negocioId }) {
               </span>
               <div className="acciones">
                 <button className="btn-accion" onClick={() => editarLote(l)}>Editar</button>
-                <button className="btn-borrar" onClick={() => borrarLote(l.id)}>Borrar</button>
+                <button
+                  className="btn-borrar"
+                  onClick={() => borrarLote(l)}
+                  disabled={eliminando === l.id}
+                >
+                  {eliminando === l.id ? "Borrando..." : "Borrar"}
+                </button>
               </div>
             </div>
           ))}
-          {lotes.length === 0 && <p className="lista-vacia">Sin lotes</p>}
+          {datos.lotes.length === 0 && <p className="lista-vacia">Sin lotes</p>}
         </div>
-      </section>
+      </Tarjeta>
 
       {/* PRODUCTOS */}
-      <section>
-        <h2>Productos</h2>
+      <Tarjeta id="productos" titulo="Productos">
         <form onSubmit={guardarProducto}>
           <div className="campo">
             <label>Nombre</label>
             <input
               type="text"
               placeholder="Nombre del producto"
-              value={nombreProducto}
-              onChange={(e) => setNombreProducto(e.target.value)}
+              value={formP.nombre}
+              onChange={(e) => actualizarForm("producto", { nombre: e.target.value })}
             />
           </div>
           <div className="grid-form-config">
             <div className="campo">
               <label>Lote</label>
-              <select value={loteProducto} onChange={(e) => setLoteProducto(e.target.value)}>
+              <select
+                value={formP.lote_id}
+                onChange={(e) => actualizarForm("producto", { lote_id: e.target.value })}
+              >
                 <option value="">Seleccionar lote</option>
-                {lotes.map((l) => (
+                {datos.lotes.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.fecha} — {l.descripcion || `Lote ${l.id}`}
                   </option>
@@ -539,8 +681,8 @@ function Configuracion({ negocioId }) {
                 type="number"
                 placeholder="0.00"
                 step="any"
-                value={costoUsdProducto}
-                onChange={(e) => setCostoUsdProducto(e.target.value)}
+                value={formP.costo_usd}
+                onChange={(e) => actualizarForm("producto", { costo_usd: e.target.value })}
               />
             </div>
           </div>
@@ -550,18 +692,22 @@ function Configuracion({ negocioId }) {
               <input
                 type="number"
                 placeholder="0"
-                value={cantidadProducto}
-                onChange={(e) => setCantidadProducto(e.target.value)}
+                value={formP.cantidad_comprada}
+                onChange={(e) => actualizarForm("producto", { cantidad_comprada: e.target.value })}
               />
             </div>
             <div className="campo">
               <label>&nbsp;</label>
-              <button type="button" className="btn-secundario" onClick={pedirSugerencia} style={{ width: "100%" }}>
+              <button
+                type="button"
+                className="btn-secundario"
+                onClick={pedirSugerencia}
+                style={{ width: "100%" }}
+              >
                 Calcular sugerencia
               </button>
             </div>
           </div>
-
           {sugerencia !== null && (
             <div className="caja-sugerencia">
               <p>Costo unitario: <strong>{sugerencia.costo_unitario}</strong></p>
@@ -569,40 +715,47 @@ function Configuracion({ negocioId }) {
               <p>Precio sugerido: <strong>{sugerencia.precio_sugerido}</strong></p>
             </div>
           )}
-
           <div className="campo">
             <label>Precio final</label>
             <input
               type="number"
               placeholder="0"
-              value={precioProducto}
-              onChange={(e) => setPrecioProducto(e.target.value)}
+              value={formP.precio}
+              onChange={(e) => actualizarForm("producto", { precio: e.target.value })}
             />
           </div>
           <div className="fila-form">
-            <button type="submit" className="btn-principal">
-              {editandoProductoId ? "Guardar" : "Crear producto"}
+            <button type="submit" className="btn-principal" disabled={guardando === "producto"}>
+              {guardando === "producto"
+                ? "Guardando..."
+                : editandoId.producto ? "Guardar" : "Crear producto"}
             </button>
-            {editandoProductoId && (
-              <button type="button" className="btn-secundario" onClick={limpiarFormProducto}>
+            {editandoId.producto && (
+              <button type="button" className="btn-secundario" onClick={() => resetForm("producto")}>
                 Cancelar
               </button>
             )}
           </div>
         </form>
         <div className="lista-items">
-          {productos.map((p) => (
+          {datos.productos.map((p) => (
             <div className="fila-item" key={p.id}>
               <span>{p.nombre} — <strong>{formatearMonto(p.precio)}</strong></span>
               <div className="acciones">
                 <button className="btn-accion" onClick={() => editarProducto(p)}>Editar</button>
-                <button className="btn-borrar" onClick={() => borrarProducto(p.id)}>Borrar</button>
+                <button
+                  className="btn-borrar"
+                  onClick={() => borrarProducto(p)}
+                  disabled={eliminando === p.id}
+                >
+                  {eliminando === p.id ? "Borrando..." : "Borrar"}
+                </button>
               </div>
             </div>
           ))}
-          {productos.length === 0 && <p className="lista-vacia">Sin productos</p>}
+          {datos.productos.length === 0 && <p className="lista-vacia">Sin productos</p>}
         </div>
-      </section>
+      </Tarjeta>
     </div>
   )
 }

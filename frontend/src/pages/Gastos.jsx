@@ -1,313 +1,756 @@
-import { useState, useEffect } from "react"
-import { apiGet, apiPost, apiPut, apiDelete } from "../api/client"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+
+import {
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiPut,
+} from "../api/client"
+
+const FILTROS = {
+  HOY: "hoy",
+  SEMANA: "semana",
+  MES: "mes",
+  TODO: "todo",
+}
+
+const FORMULARIO_INICIAL = {
+  categoriaId: "",
+  monto: "",
+  fecha: obtenerFechaActual(),
+  descripcion: "",
+}
+
+const FORMATEADOR_MONTO = new Intl.NumberFormat("es-PY", {
+  maximumFractionDigits: 0,
+})
 
 function Gastos({ negocioId }) {
+  const temporizadorMensaje = useRef(null)
+
   const [gastos, setGastos] = useState([])
   const [categorias, setCategorias] = useState([])
-
-  // Formulario
-  const [categoriaId, setCategoriaId] = useState("")
-  const [monto, setMonto] = useState("")
-  const [fecha, setFecha] = useState("")
-  const [descripcion, setDescripcion] = useState("")
+  const [formulario, setFormulario] = useState(FORMULARIO_INICIAL)
   const [editandoId, setEditandoId] = useState(null)
 
-  // UI
-  const [mensaje, setMensaje] = useState("")
-  const [tipoMensaje, setTipoMensaje] = useState("exito")
-  const [filtro, setFiltro] = useState("mes") // "hoy" | "semana" | "mes" | "todo"
+  const [filtro, setFiltro] = useState(FILTROS.MES)
   const [busqueda, setBusqueda] = useState("")
+  const [mensaje, setMensaje] = useState(null)
+
+  const [cargando, setCargando] = useState(true)
+  const [guardando, setGuardando] = useState(false)
+  const [eliminandoId, setEliminandoId] = useState(null)
+
+  const mostrarMensaje = useCallback((texto, tipo = "exito") => {
+    if (temporizadorMensaje.current) {
+      window.clearTimeout(temporizadorMensaje.current)
+    }
+
+    setMensaje({ texto, tipo })
+
+    if (tipo !== "error") {
+      temporizadorMensaje.current = window.setTimeout(() => {
+        setMensaje(null)
+      }, 4000)
+    }
+  }, [])
+
+  const cargarDatos = useCallback(async () => {
+    if (!negocioId) {
+      setGastos([])
+      setCategorias([])
+      setCargando(false)
+      return
+    }
+
+    try {
+      setCargando(true)
+
+      const [gastosData, categoriasData] = await Promise.all([
+        apiGet(`/negocios/${negocioId}/gastos/`),
+        apiGet(`/negocios/${negocioId}/categorias/`),
+      ])
+
+      setGastos(Array.isArray(gastosData) ? gastosData : [])
+      setCategorias(
+        Array.isArray(categoriasData) ? categoriasData : []
+      )
+    } catch (error) {
+      mostrarMensaje(
+        error?.message || "No se pudieron cargar los gastos.",
+        "error"
+      )
+    } finally {
+      setCargando(false)
+    }
+  }, [negocioId, mostrarMensaje])
 
   useEffect(() => {
     cargarDatos()
-  }, [negocioId])
+  }, [cargarDatos])
 
-  async function cargarDatos() {
-    try {
-      const gastosData = await apiGet(`/negocios/${negocioId}/gastos/`)
-      const categoriasData = await apiGet(`/negocios/${negocioId}/categorias/`)
-      setGastos(gastosData)
-      setCategorias(categoriasData)
-    } catch (error) {
-      mostrarMsg("Error cargando datos: " + error.message, "error")
+  useEffect(() => {
+    return () => {
+      if (temporizadorMensaje.current) {
+        window.clearTimeout(temporizadorMensaje.current)
+      }
     }
-  }
+  }, [])
 
-  function mostrarMsg(texto, tipo) {
-    setMensaje(texto)
-    setTipoMensaje(tipo || "exito")
-    if (tipo !== "error") {
-      setTimeout(() => setMensaje(""), 4000)
-    }
-  }
+  const categoriasPorId = useMemo(() => {
+    return new Map(
+      categorias.map((categoria) => [
+        String(categoria.id),
+        categoria,
+      ])
+    )
+  }, [categorias])
 
-  function nombreCategoria(id) {
-    const categoria = categorias.find((c) => c.id === id)
-    return categoria ? categoria.nombre : "—"
-  }
-
-  function formatearMonto(valor) {
-    return Number(valor).toLocaleString("es-PY")
-  }
-
-  // --- Filtros ---
-  function gastosFiltrados() {
+  const gastosFiltrados = useMemo(() => {
     const ahora = new Date()
-    let resultado = []
+    const inicioHoy = new Date(
+      ahora.getFullYear(),
+      ahora.getMonth(),
+      ahora.getDate()
+    )
 
-    for (let i = 0; i < gastos.length; i++) {
-      const gasto = gastos[i]
-      const fechaGasto = new Date(gasto.fecha)
+    const inicioSemana = new Date(inicioHoy)
+    inicioSemana.setDate(inicioHoy.getDate() - 6)
 
-      // Filtro por período
-      let pasaFiltro = false
-      if (filtro === "todo") {
-        pasaFiltro = true
-      } else if (filtro === "hoy") {
-        pasaFiltro =
-          fechaGasto.getFullYear() === ahora.getFullYear() &&
-          fechaGasto.getMonth() === ahora.getMonth() &&
-          fechaGasto.getDate() === ahora.getDate()
-      } else if (filtro === "semana") {
-        const haceUnaSemana = new Date(ahora)
-        haceUnaSemana.setDate(haceUnaSemana.getDate() - 7)
-        pasaFiltro = fechaGasto >= haceUnaSemana
-      } else if (filtro === "mes") {
-        pasaFiltro =
-          fechaGasto.getFullYear() === ahora.getFullYear() &&
-          fechaGasto.getMonth() === ahora.getMonth()
-      }
+    const termino = normalizarTexto(busqueda)
 
-      if (!pasaFiltro) {
-        continue
-      }
+    return gastos
+      .filter((gasto) => {
+        const fechaGasto = convertirFechaLocal(gasto.fecha)
 
-      // Filtro por búsqueda
-      if (busqueda.trim()) {
-        const termino = busqueda.toLowerCase()
-        const coincideCategoria = nombreCategoria(gasto.categoria_id).toLowerCase().includes(termino)
-        const coincideDescripcion = gasto.descripcion && gasto.descripcion.toLowerCase().includes(termino)
-        if (!coincideCategoria && !coincideDescripcion) {
-          continue
+        if (!fechaGasto) return false
+
+        let coincidePeriodo = true
+
+        if (filtro === FILTROS.HOY) {
+          coincidePeriodo =
+            fechaGasto.getTime() === inicioHoy.getTime()
         }
+
+        if (filtro === FILTROS.SEMANA) {
+          coincidePeriodo =
+            fechaGasto >= inicioSemana &&
+            fechaGasto <= ahora
+        }
+
+        if (filtro === FILTROS.MES) {
+          coincidePeriodo =
+            fechaGasto.getFullYear() === ahora.getFullYear() &&
+            fechaGasto.getMonth() === ahora.getMonth()
+        }
+
+        if (!coincidePeriodo) return false
+        if (!termino) return true
+
+        const categoria = obtenerNombreCategoria(
+          gasto.categoria_id,
+          categoriasPorId
+        )
+
+        return (
+          normalizarTexto(categoria).includes(termino) ||
+          normalizarTexto(gasto.descripcion).includes(termino)
+        )
+      })
+      .sort((a, b) => {
+        const fechaA = convertirFechaLocal(a.fecha)?.getTime() || 0
+        const fechaB = convertirFechaLocal(b.fecha)?.getTime() || 0
+
+        return fechaB - fechaA
+      })
+  }, [gastos, categoriasPorId, filtro, busqueda])
+
+  const resumen = useMemo(() => {
+    return gastosFiltrados.reduce(
+      (resultado, gasto) => {
+        resultado.total += convertirNumero(gasto.monto)
+        resultado.cantidad += 1
+
+        return resultado
+      },
+      {
+        total: 0,
+        cantidad: 0,
       }
+    )
+  }, [gastosFiltrados])
 
-      resultado.push(gasto)
-    }
+  const formularioValido =
+    formulario.categoriaId &&
+    convertirNumero(formulario.monto) > 0 &&
+    formulario.fecha
 
-    return resultado
+  function actualizarFormulario(campo, valor) {
+    setFormulario((formularioActual) => ({
+      ...formularioActual,
+      valor,
+    }))
   }
 
-  function totalFiltrado() {
-    const lista = gastosFiltrados()
-    let total = 0
-    for (let i = 0; i < lista.length; i++) {
-      total = total + Number(lista[i].monto)
-    }
-    return total
-  }
-
-  // --- CRUD ---
   function cargarEnFormulario(gasto) {
     setEditandoId(gasto.id)
-    setCategoriaId(gasto.categoria_id)
-    setMonto(gasto.monto)
-    setFecha(gasto.fecha)
-    setDescripcion(gasto.descripcion || "")
+
+    setFormulario({
+      categoriaId: String(gasto.categoria_id || ""),
+      monto: String(gasto.monto || ""),
+      fecha: gasto.fecha || obtenerFechaActual(),
+      descripcion: gasto.descripcion || "",
+    })
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    })
   }
 
   function limpiarFormulario() {
     setEditandoId(null)
-    setCategoriaId("")
-    setMonto("")
-    setFecha("")
-    setDescripcion("")
+    setFormulario({
+      ...FORMULARIO_INICIAL,
+      fecha: obtenerFechaActual(),
+    })
+  }
+
+  function limpiarFiltros() {
+    setBusqueda("")
+    setFiltro(FILTROS.MES)
+  }
+
+  function validarFormulario() {
+    if (!formulario.categoriaId) {
+      return "Seleccioná una categoría."
+    }
+
+    if (convertirNumero(formulario.monto) <= 0) {
+      return "Ingresá un monto mayor que cero."
+    }
+
+    if (!formulario.fecha) {
+      return "Ingresá la fecha del gasto."
+    }
+
+    return null
   }
 
   async function guardarGasto(evento) {
     evento.preventDefault()
 
-    if (!categoriaId) {
-      mostrarMsg("Seleccioná una categoría", "error")
-      return
-    }
-    if (!monto || Number(monto) <= 0) {
-      mostrarMsg("Ingresá un monto válido", "error")
-      return
-    }
-    if (!fecha) {
-      mostrarMsg("Ingresá la fecha", "error")
+    const errorValidacion = validarFormulario()
+
+    if (errorValidacion) {
+      mostrarMensaje(errorValidacion, "error")
       return
     }
 
     const datos = {
-      categoria_id: categoriaId,
-      monto: monto,
-      fecha: fecha,
-      descripcion: descripcion,
+      categoria_id: Number(formulario.categoriaId),
+      monto: convertirNumero(formulario.monto),
+      fecha: formulario.fecha,
+      descripcion: formulario.descripcion.trim() || null,
     }
 
     try {
-      let resultado
-      if (editandoId) {
-        resultado = await apiPut(`/negocios/${negocioId}/gastos/${editandoId}/`, datos)
-      } else {
-        resultado = await apiPost(`/negocios/${negocioId}/gastos/`, datos)
-      }
-      mostrarMsg(resultado.mensaje)
+      setGuardando(true)
+
+      const resultado = editandoId
+        ? await apiPut(
+            `/negocios/${negocioId}/gastos/${editandoId}/`,
+            datos
+          )
+        : await apiPost(
+            `/negocios/${negocioId}/gastos/`,
+            datos
+          )
+
+      mostrarMensaje(
+        resultado?.mensaje ||
+          (editandoId
+            ? "Gasto actualizado correctamente."
+            : "Gasto registrado correctamente.")
+      )
+
       limpiarFormulario()
       await cargarDatos()
     } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
+      mostrarMensaje(
+        error?.message || "No se pudo guardar el gasto.",
+        "error"
+      )
+    } finally {
+      setGuardando(false)
     }
   }
 
-  async function borrarGasto(gastoId) {
-    if (!confirm("¿Eliminar este gasto?")) {
-      return
-    }
+  async function borrarGasto(gasto) {
+    const debeEliminarse = window.confirm(
+      `¿Eliminar el gasto de ${formatearMonto(gasto.monto)}?`
+    )
+
+    if (!debeEliminarse) return
+
     try {
-      const resultado = await apiDelete(`/negocios/${negocioId}/gastos/${gastoId}/`)
-      mostrarMsg(resultado.mensaje)
-      await cargarDatos()
+      setEliminandoId(gasto.id)
+
+      const resultado = await apiDelete(
+        `/negocios/${negocioId}/gastos/${gasto.id}/`
+      )
+
+      setGastos((gastosActuales) =>
+        gastosActuales.filter(
+          (item) => String(item.id) !== String(gasto.id)
+        )
+      )
+
+      if (String(editandoId) === String(gasto.id)) {
+        limpiarFormulario()
+      }
+
+      mostrarMensaje(
+        resultado?.mensaje || "Gasto eliminado correctamente."
+      )
     } catch (error) {
-      mostrarMsg("Error: " + error.message, "error")
+      mostrarMensaje(
+        error?.message || "No se pudo eliminar el gasto.",
+        "error"
+      )
+    } finally {
+      setEliminandoId(null)
     }
   }
 
-  const listaFiltrada = gastosFiltrados()
+  if (cargando) {
+    return (
+      <main className="pagina-gastos">
+        <h1>Gastos</h1>
+        <p className="mensaje-cargando">Cargando gastos...</p>
+      </main>
+    )
+  }
 
   return (
-    <div>
-      <h1>Gastos</h1>
+    <main className="pagina-gastos">
+      <header className="encabezado-pagina">
+        <div>
+          <h1>Gastos</h1>
+          <p className="subtitulo-pagina">
+            Registrá y controlá los egresos del negocio.
+          </p>
+        </div>
+      </header>
 
       {mensaje && (
-        <div className={tipoMensaje === "error" ? "msg msg-error" : "msg msg-exito"}>
-          {mensaje}
-          <button className="btn-cerrar-msg" onClick={() => setMensaje("")}>×</button>
+        <div
+          className={
+            mensaje.tipo === "error"
+              ? "msg msg-error"
+              : "msg msg-exito"
+          }
+          role={mensaje.tipo === "error" ? "alert" : "status"}
+        >
+          <span>{mensaje.texto}</span>
+
+          <button
+            type="button"
+            className="btn-cerrar-msg"
+            onClick={() => setMensaje(null)}
+            aria-label="Cerrar mensaje"
+          >
+            ×
+          </button>
         </div>
       )}
 
-      {/* Formulario */}
-      <section>
-        <h2>{editandoId ? "Editar gasto" : "Registrar gasto"}</h2>
-        <form onSubmit={guardarGasto}>
+      <section className="seccion-formulario">
+        <div className="cabecera-seccion">
+          <div>
+            <h2>
+              {editandoId ? "Editar gasto" : "Registrar gasto"}
+            </h2>
+
+            <p>
+              {editandoId
+                ? "Modificá los datos del gasto seleccionado."
+                : "Cargá un nuevo egreso del negocio."}
+            </p>
+          </div>
+
+          {editandoId && (
+            <span className="modo-edicion">
+              Editando registro
+            </span>
+          )}
+        </div>
+
+        <form
+          className="form-gasto"
+          onSubmit={guardarGasto}
+        >
           <div className="grid-form-gasto">
             <div className="campo">
-              <label>Categoría</label>
-              <select value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
-                <option value="">Seleccionar</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
+              <label htmlFor="gasto-categoria">
+                Categoría
+              </label>
+
+              <select
+                id="gasto-categoria"
+                value={formulario.categoriaId}
+                onChange={(evento) =>
+                  actualizarFormulario(
+                    "categoriaId",
+                    evento.target.value
+                  )
+                }
+                required
+              >
+                <option value="">Seleccionar categoría</option>
+
+                {categorias.map((categoria) => (
+                  <option
+                    key={categoria.id}
+                    value={categoria.id}
+                  >
+                    {categoria.nombre}
+                  </option>
                 ))}
               </select>
             </div>
+
             <div className="campo">
-              <label>Monto</label>
+              <label htmlFor="gasto-monto">Monto</label>
+
               <input
+                id="gasto-monto"
                 type="number"
+                min="1"
+                step="any"
                 placeholder="0"
-                value={monto}
-                min="0"
-                onChange={(e) => setMonto(e.target.value)}
+                value={formulario.monto}
+                onChange={(evento) =>
+                  actualizarFormulario(
+                    "monto",
+                    evento.target.value
+                  )
+                }
+                required
               />
             </div>
+
             <div className="campo">
-              <label>Fecha</label>
+              <label htmlFor="gasto-fecha">Fecha</label>
+
               <input
+                id="gasto-fecha"
                 type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
+                value={formulario.fecha}
+                onChange={(evento) =>
+                  actualizarFormulario(
+                    "fecha",
+                    evento.target.value
+                  )
+                }
+                required
               />
             </div>
           </div>
+
           <div className="campo">
-            <label>Descripción (opcional)</label>
+            <label htmlFor="gasto-descripcion">
+              Descripción opcional
+            </label>
+
             <input
+              id="gasto-descripcion"
               type="text"
-              placeholder="Ej: envío, packaging, publicidad..."
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Envío, packaging, publicidad..."
+              value={formulario.descripcion}
+              onChange={(evento) =>
+                actualizarFormulario(
+                  "descripcion",
+                  evento.target.value
+                )
+              }
+              maxLength={250}
             />
+
+            <span className="contador contador-descripcion">
+              {formulario.descripcion.length}/250
+            </span>
           </div>
-          <div className="fila-form">
-            <button type="submit" className="btn-principal">
-              {editandoId ? "Guardar cambios" : "Registrar gasto"}
-            </button>
+
+          <div className="acciones-formulario-gasto">
             {editandoId && (
-              <button type="button" className="btn-secundario" onClick={limpiarFormulario}>
+              <button
+                type="button"
+                className="btn-secundario"
+                onClick={limpiarFormulario}
+                disabled={guardando}
+              >
                 Cancelar
               </button>
             )}
+
+            <button
+              type="submit"
+              className="btn-principal"
+              disabled={!formularioValido || guardando}
+            >
+              {guardando
+                ? "Guardando..."
+                : editandoId
+                  ? "Guardar cambios"
+                  : "Registrar gasto"}
+            </button>
           </div>
         </form>
       </section>
 
-      {/* Listado */}
-      <div className="barra-filtro">
-        <h2>Historial</h2>
-        <div className="filtros-periodo">
-          <button
-            className={filtro === "hoy" ? "btn-filtro activo" : "btn-filtro"}
-            onClick={() => setFiltro("hoy")}
-          >Hoy</button>
-          <button
-            className={filtro === "semana" ? "btn-filtro activo" : "btn-filtro"}
-            onClick={() => setFiltro("semana")}
-          >Semana</button>
-          <button
-            className={filtro === "mes" ? "btn-filtro activo" : "btn-filtro"}
-            onClick={() => setFiltro("mes")}
-          >Mes</button>
-          <button
-            className={filtro === "todo" ? "btn-filtro activo" : "btn-filtro"}
-            onClick={() => setFiltro("todo")}
-          >Todo</button>
+      <section className="seccion-listado">
+        <div className="barra-filtro">
+          <div>
+            <h2>Historial</h2>
+            <p>Gastos registrados en el período seleccionado.</p>
+          </div>
+
+          <div
+            className="filtros-periodo"
+            aria-label="Filtrar gastos por período"
+          >
+            {[
+              [FILTROS.HOY, "Hoy"],
+              [FILTROS.SEMANA, "7 días"],
+              [FILTROS.MES, "Mes"],
+              [FILTROS.TODO, "Todo"],
+            ].map(([valor, etiqueta]) => (
+              <button
+                key={valor}
+                type="button"
+                className={
+                  filtro === valor
+                    ? "btn-filtro activo"
+                    : "btn-filtro"
+                }
+                onClick={() => setFiltro(valor)}
+                aria-pressed={filtro === valor}
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </div>
+
+          <div className="total-filtro">
+            <span>
+              {resumen.cantidad}{" "}
+              {resumen.cantidad === 1 ? "gasto" : "gastos"}
+            </span>
+
+            <strong>{formatearMonto(resumen.total)}</strong>
+          </div>
         </div>
-        <span className="total-filtro">
-          {listaFiltrada.length} gastos — Total: {formatearMonto(totalFiltrado())}
-        </span>
-      </div>
 
-      <div className="barra-busqueda-gastos">
-        <input
-          type="text"
-          placeholder="Buscar por categoría o descripción..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-      </div>
+        <div className="barra-busqueda-gastos">
+          <div className="campo buscador-gastos">
+            <label htmlFor="buscar-gasto">
+              Buscar gastos
+            </label>
 
-      <table className="tabla">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Categoría</th>
-            <th>Monto</th>
-            <th>Descripción</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {listaFiltrada.map((g) => (
-            <tr key={g.id}>
-              <td>{g.fecha}</td>
-              <td>{nombreCategoria(g.categoria_id)}</td>
-              <td className="monto">{formatearMonto(g.monto)}</td>
-              <td>{g.descripcion || "—"}</td>
-              <td className="acciones-celda">
-                <button className="btn-accion" onClick={() => cargarEnFormulario(g)}>Editar</button>
-                <button className="btn-borrar" onClick={() => borrarGasto(g.id)}>Borrar</button>
-              </td>
-            </tr>
-          ))}
-          {listaFiltrada.length === 0 && (
-            <tr><td colSpan="5" className="celda-vacia">Sin gastos en este período</td></tr>
+            <input
+              id="buscar-gasto"
+              type="search"
+              placeholder="Categoría o descripción"
+              value={busqueda}
+              onChange={(evento) =>
+                setBusqueda(evento.target.value)
+              }
+            />
+          </div>
+
+          {(busqueda || filtro !== FILTROS.MES) && (
+            <button
+              type="button"
+              className="btn-limpiar"
+              onClick={limpiarFiltros}
+            >
+              Limpiar filtros
+            </button>
           )}
-        </tbody>
-      </table>
-    </div>
+        </div>
+
+        <div className="contenedor-tabla">
+          <table className="tabla tabla-gastos">
+            <thead>
+              <tr>
+                <th scope="col">Fecha</th>
+                <th scope="col">Categoría</th>
+                <th scope="col">Descripción</th>
+                <th scope="col" className="columna-numerica">
+                  Monto
+                </th>
+                <th scope="col">Acciones</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {gastosFiltrados.map((gasto) => (
+                <tr key={gasto.id}>
+                  <td>{formatearFecha(gasto.fecha)}</td>
+
+                  <td>
+                    <span className="categoria-gasto">
+                      {obtenerNombreCategoria(
+                        gasto.categoria_id,
+                        categoriasPorId
+                      )}
+                    </span>
+                  </td>
+
+                  <td className="descripcion-gasto">
+                    {gasto.descripcion || "Sin descripción"}
+                  </td>
+
+                  <td className="monto monto-gasto columna-numerica">
+                    {formatearMonto(gasto.monto)}
+                  </td>
+
+                  <td>
+                    <div className="acciones-celda">
+                      <button
+                        type="button"
+                        className="btn-accion"
+                        onClick={() =>
+                          cargarEnFormulario(gasto)
+                        }
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-borrar"
+                        onClick={() => borrarGasto(gasto)}
+                        disabled={eliminandoId === gasto.id}
+                      >
+                        {eliminandoId === gasto.id
+                          ? "Eliminando..."
+                          : "Eliminar"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+
+              {gastosFiltrados.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="celda-vacia">
+                    <p>
+                      {busqueda.trim()
+                        ? `No hay resultados para "${busqueda.trim()}".`
+                        : "No hay gastos en este período."}
+                    </p>
+
+                    {(busqueda || filtro !== FILTROS.MES) && (
+                      <button
+                        type="button"
+                        className="btn-secundario"
+                        onClick={limpiarFiltros}
+                      >
+                        Limpiar filtros
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+
+            {gastosFiltrados.length > 0 && (
+              <tfoot>
+                <tr>
+                  <td colSpan={3}>
+                    Total de {resumen.cantidad} registros
+                  </td>
+
+                  <td className="monto columna-numerica">
+                    {formatearMonto(resumen.total)}
+                  </td>
+
+                  <td />
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </section>
+    </main>
   )
+}
+
+function obtenerNombreCategoria(id, categoriasPorId) {
+  return (
+    categoriasPorId.get(String(id))?.nombre ||
+    "Sin categoría"
+  )
+}
+
+function obtenerFechaActual() {
+  const ahora = new Date()
+  const desplazamiento = ahora.getTimezoneOffset() * 60_000
+
+  return new Date(ahora.getTime() - desplazamiento)
+    .toISOString()
+    .split("T")[0]
+}
+
+function convertirFechaLocal(fecha) {
+  if (!fecha) return null
+
+  const [anio, mes, dia] = String(fecha)
+    .split("T")[0]
+    .split("-")
+    .map(Number)
+
+  if (!anio || !mes || !dia) return null
+
+  return new Date(anio, mes - 1, dia)
+}
+
+function formatearFecha(fecha) {
+  const fechaLocal = convertirFechaLocal(fecha)
+
+  if (!fechaLocal) return "Sin fecha"
+
+  return fechaLocal.toLocaleDateString("es-PY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
+}
+
+function normalizarTexto(valor = "") {
+  return String(valor)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+}
+
+function convertirNumero(valor) {
+  const numero = Number(valor)
+
+  return Number.isFinite(numero) ? numero : 0
+}
+
+function formatearMonto(valor) {
+  return FORMATEADOR_MONTO.format(convertirNumero(valor))
 }
 
 export default Gastos
