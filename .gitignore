@@ -6,3 +6,12 @@ db.sqlite3
 staticfiles/
 frontend/node_modules/
 frontend/dist/
+
+# Script con credenciales
+migrar_a_neon.py
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

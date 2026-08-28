@@ -12,13 +12,14 @@ class ClientesView(APIView):
 
     def post(self, request, negocio_id):
         nombre = request.data.get("nombre")
+        celular = request.data.get("celular")
         contacto = request.data.get("contacto")
         fecha_nacimiento = request.data.get("fecha_nacimiento")
         correo = request.data.get("correo")
         ruc = request.data.get("ruc")
 
-        query = "INSERT INTO cliente (negocio_id, nombre, contacto, fecha_nacimiento, correo, ruc) VALUES (%s, %s, %s, %s, %s, %s)"
-        parametros = [negocio_id, nombre, contacto, fecha_nacimiento, correo, ruc]
+        query = "INSERT INTO cliente (negocio_id, nombre, celular, contacto, fecha_nacimiento, correo, ruc) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        parametros = [negocio_id, nombre, celular, contacto, fecha_nacimiento, correo, ruc]
 
         registros_afectados = execute_command(query, parametros)
 
@@ -38,13 +39,14 @@ class ClienteDetalleView(APIView):
 
     def put(self, request, negocio_id, cliente_id):
         nombre = request.data.get("nombre")
+        celular = request.data.get("celular")
         contacto = request.data.get("contacto")
         fecha_nacimiento = request.data.get("fecha_nacimiento")
         correo = request.data.get("correo")
         ruc = request.data.get("ruc")
 
-        query = "UPDATE cliente SET nombre = %s, contacto = %s, fecha_nacimiento = %s, correo = %s, ruc = %s WHERE id = %s AND negocio_id = %s"
-        parametros = [nombre, contacto, fecha_nacimiento, correo, ruc, cliente_id, negocio_id]
+        query = "UPDATE cliente SET nombre = %s, celular = %s, contacto = %s, fecha_nacimiento = %s, correo = %s, ruc = %s WHERE id = %s AND negocio_id = %s"
+        parametros = [nombre, celular, contacto, fecha_nacimiento, correo, ruc, cliente_id, negocio_id]
 
         registros = execute_command(query, parametros)
 
@@ -65,7 +67,7 @@ class ClienteDetalleView(APIView):
 
 class ProductosView(APIView):
     def get(self, request, negocio_id):
-        query = "SELECT id, negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada FROM producto WHERE negocio_id = %s"
+        query = "SELECT id, negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada, imagen_url FROM producto WHERE negocio_id = %s"
         registros = fetch_all(query, [negocio_id])
         return Response(registros)
 
@@ -76,9 +78,15 @@ class ProductosView(APIView):
         lote_id = request.data.get("lote_id")
         costo_usd = request.data.get("costo_usd")
         cantidad_comprada = request.data.get("cantidad_comprada")
+        imagen_url = request.data.get("imagen_url")
 
-        query = "INSERT INTO producto (negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-        parametros = [negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada]
+        if costo_usd is not None and lote_id is not None:
+            lote = fetch_one("SELECT tasa_cambio FROM lote WHERE id = %s AND negocio_id = %s", [lote_id, negocio_id])
+            if lote is not None:
+                costo = float(costo_usd) * float(lote["tasa_cambio"])
+
+        query = "INSERT INTO producto (negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada, imagen_url) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+        parametros = [negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada, imagen_url]
 
         filas_afectadas = execute_command(query, parametros)
 
@@ -105,9 +113,15 @@ class ProductoDetalleView(APIView):
         lote_id = request.data.get("lote_id")
         costo_usd = request.data.get("costo_usd")
         cantidad_comprada = request.data.get("cantidad_comprada")
+        imagen_url = request.data.get("imagen_url")
 
-        query = "UPDATE producto SET nombre = %s, precio = %s, costo = %s, lote_id = %s, costo_usd = %s, cantidad_comprada = %s WHERE id = %s AND negocio_id = %s"
-        parametros = [nombre, precio, costo, lote_id, costo_usd, cantidad_comprada, producto_id, negocio_id]
+        if costo_usd is not None and lote_id is not None:
+            lote = fetch_one("SELECT tasa_cambio FROM lote WHERE id = %s AND negocio_id = %s", [lote_id, negocio_id])
+            if lote is not None:
+                costo = float(costo_usd) * float(lote["tasa_cambio"])
+
+        query = "UPDATE producto SET nombre = %s, precio = %s, costo = %s, lote_id = %s, costo_usd = %s, cantidad_comprada = %s, imagen_url = %s WHERE id = %s AND negocio_id = %s"
+        parametros = [nombre, precio, costo, lote_id, costo_usd, cantidad_comprada, imagen_url, producto_id, negocio_id]
 
         filas_afectadas = execute_command(query, parametros)
 
@@ -135,11 +149,13 @@ class VentasView(APIView):
     def post(self, request, negocio_id):
         cliente_id = request.data.get("cliente_id")
         fecha = request.data.get("fecha")
+        metodo_pago = request.data.get("metodo_pago", "efectivo")
+        notas = request.data.get("notas")
         productos = request.data.get("productos")
 
         try:
             with transaction.atomic():
-                venta_id = self.crear_venta(negocio_id, cliente_id, fecha, productos)
+                venta_id = self.crear_venta(negocio_id, cliente_id, fecha, metodo_pago, notas, productos)
         except Exception as error:
             return Response({"error": "No se pudo completar la venta"}, status=400)
 
@@ -153,18 +169,23 @@ class VentasView(APIView):
             "avisos": avisos,
         })
 
-    def crear_venta(self, negocio_id, cliente_id, fecha, productos):
-        query = "INSERT INTO venta (negocio_id, cliente_id, fecha, monto_total) VALUES (%s, %s, %s, %s) RETURNING id"
-        venta_id = execute_insert(query, [negocio_id, cliente_id, fecha, 0])
+    def crear_venta(self, negocio_id, cliente_id, fecha, metodo_pago, notas, productos):
+        query = "INSERT INTO venta (negocio_id, cliente_id, fecha, monto_total, metodo_pago, notas) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id"
+        venta_id = execute_insert(query, [negocio_id, cliente_id, fecha, 0, metodo_pago, notas])
 
         monto_acumulado = 0
         for producto_item in productos:
             producto_id = producto_item.get("producto_id")
             cantidad = producto_item.get("cantidad")
+            precio_vendido = producto_item.get("precio_vendido")
 
-            query_precio = "SELECT precio FROM producto WHERE id = %s"
-            precio_producto = fetch_one(query_precio, [producto_id])
-            precio = precio_producto["precio"]
+            if precio_vendido is not None:
+                precio = float(precio_vendido)
+            else:
+                query_precio = "SELECT precio FROM producto WHERE id = %s"
+                precio_producto = fetch_one(query_precio, [producto_id])
+                precio = precio_producto["precio"]
+
             subtotal = precio * cantidad
 
             query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s)"
@@ -220,11 +241,13 @@ class VentaDetalleView(APIView):
     def put(self, request, negocio_id, venta_id):
         cliente_id = request.data.get("cliente_id")
         fecha = request.data.get("fecha")
+        metodo_pago = request.data.get("metodo_pago", "efectivo")
+        notas = request.data.get("notas")
         productos = request.data.get("productos")
 
         try:
             with transaction.atomic():
-                self.actualizar_venta(negocio_id, venta_id, cliente_id, fecha, productos)
+                self.actualizar_venta(negocio_id, venta_id, cliente_id, fecha, metodo_pago, notas, productos)
         except Exception as error:
             return Response({"error": "No se pudo actualizar la venta"}, status=400)
 
@@ -237,9 +260,9 @@ class VentaDetalleView(APIView):
             "avisos": avisos,
         })
 
-    def actualizar_venta(self, negocio_id, venta_id, cliente_id, fecha, productos):
-        query_venta = "UPDATE venta SET cliente_id = %s, fecha = %s WHERE id = %s AND negocio_id = %s"
-        execute_command(query_venta, [cliente_id, fecha, venta_id, negocio_id])
+    def actualizar_venta(self, negocio_id, venta_id, cliente_id, fecha, metodo_pago, notas, productos):
+        query_venta = "UPDATE venta SET cliente_id = %s, fecha = %s, metodo_pago = %s, notas = %s WHERE id = %s AND negocio_id = %s"
+        execute_command(query_venta, [cliente_id, fecha, metodo_pago, notas, venta_id, negocio_id])
 
         query_borrar = "DELETE FROM venta_detalle WHERE venta_id = %s"
         execute_command(query_borrar, [venta_id])
@@ -248,10 +271,15 @@ class VentaDetalleView(APIView):
         for producto_item in productos:
             producto_id = producto_item.get("producto_id")
             cantidad = producto_item.get("cantidad")
+            precio_vendido = producto_item.get("precio_vendido")
 
-            query_precio = "SELECT precio FROM producto WHERE id = %s"
-            precio_producto = fetch_one(query_precio, [producto_id])
-            precio = precio_producto["precio"]
+            if precio_vendido is not None:
+                precio = float(precio_vendido)
+            else:
+                query_precio = "SELECT precio FROM producto WHERE id = %s"
+                precio_producto = fetch_one(query_precio, [producto_id])
+                precio = precio_producto["precio"]
+
             subtotal = precio * cantidad
 
             query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s)"
@@ -383,7 +411,8 @@ class SugerenciaPrecioView(APIView):
         else:
             multiplicador = 2.2
 
-        precio_sugerido = round(costo_unitario) * multiplicador
+        packaging = 5000
+        precio_sugerido = (round(costo_unitario) * multiplicador) + packaging 
 
         respuesta = {
             "costo_unitario": costo_unitario,

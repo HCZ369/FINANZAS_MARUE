@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { apiGet, apiPost, apiPut, apiDelete } from "../api/client"
+import { formatearMonto } from "../utils"
 
-// =============================================
-// Estados iniciales de formularios
-// =============================================
 const FORM_INICIAL = {
   negocio: { nombre: "" },
   categoria: { nombre: "", tipo: "gasto" },
@@ -56,19 +54,12 @@ function Configuracion({ negocioId }) {
     productos: true,
   })
 
-  // =============================================
-  // Helpers
-  // =============================================
   const mostrarMsg = useCallback((texto, tipo = "exito") => {
     setMensaje({ texto, tipo })
     if (tipo !== "error") {
       setTimeout(() => setMensaje({ texto: "", tipo: "exito" }), 4000)
     }
   }, [])
-
-  function formatearMonto(valor) {
-    return Number(valor).toLocaleString("es-PY")
-  }
 
   function actualizarForm(seccion, campos) {
     setForms((prev) => ({ ...prev, [seccion]: { ...prev[seccion], ...campos } }))
@@ -84,9 +75,6 @@ function Configuracion({ negocioId }) {
     setAbiertas((prev) => ({ ...prev, [seccion]: !prev[seccion] }))
   }
 
-  // =============================================
-  // Carga de datos (paralela)
-  // =============================================
   const cargarDatos = useCallback(async () => {
     setCargando(true)
     try {
@@ -109,14 +97,6 @@ function Configuracion({ negocioId }) {
     cargarDatos()
   }, [cargarDatos])
 
-  // =============================================
-  // CRUD genérico
-  // seccion: clave del form ("negocio", "categoria", ...)
-  // coleccion: clave en `datos` ("negocios", "categorias", ...)
-  // urlBase: URL sin ID (para POST). PUT/DELETE agregan `${id}/`
-  // validar: fn(form) => string|null (null si es válido)
-  // nombreItem: fn(item) => texto para mensajes
-  // =============================================
   async function guardar({ seccion, coleccion, urlBase, validar, datosPayload }) {
     const form = forms[seccion]
     const id = editandoId[seccion]
@@ -184,9 +164,9 @@ function Configuracion({ negocioId }) {
     }
   }
 
-  // =============================================
+  
   // NEGOCIOS
-  // =============================================
+  
   function guardarNegocio(e) {
     e.preventDefault()
     guardar({
@@ -211,9 +191,9 @@ function Configuracion({ negocioId }) {
     })
   }
 
-  // =============================================
+  
   // CATEGORÍAS
-  // =============================================
+  
   function guardarCategoria(e) {
     e.preventDefault()
     guardar({
@@ -242,9 +222,9 @@ function Configuracion({ negocioId }) {
     })
   }
 
-  // =============================================
+  
   // INYECCIONES
-  // =============================================
+  
   function guardarInyeccion(e) {
     e.preventDefault()
     guardar({
@@ -273,9 +253,9 @@ function Configuracion({ negocioId }) {
     })
   }
 
-  // =============================================
+  
   // LOTES
-  // =============================================
+  
   function guardarLote(e) {
     e.preventDefault()
     guardar({
@@ -308,9 +288,9 @@ function Configuracion({ negocioId }) {
     })
   }
 
-  // =============================================
+  
   // PRODUCTOS
-  // =============================================
+  
   function guardarProducto(e) {
     e.preventDefault()
     guardar({
@@ -376,9 +356,9 @@ function Configuracion({ negocioId }) {
     }
   }
 
-  // =============================================
+  
   // Subcomponente: tarjeta colapsable
-  // =============================================
+  
   function Tarjeta({ id, titulo, children }) {
     const abierta = abiertas[id]
     return (
@@ -394,9 +374,9 @@ function Configuracion({ negocioId }) {
     )
   }
 
-  // =============================================
+  
   // Render
-  // =============================================
+  
   const formN = forms.negocio
   const formC = forms.categoria
   const formI = forms.inyeccion

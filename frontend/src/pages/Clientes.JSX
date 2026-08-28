@@ -12,10 +12,17 @@ import {
   apiPost,
   apiPut,
 } from "../api/client"
+import {
+  normalizarTexto,
+  convertirNumero,
+  formatearFecha,
+  formatearMonto,
+  formatearCantidad,
+  obtenerIniciales,
+} from "../utils"
 
 const FORMULARIO_INICIAL = {
   nombre: "",
-  celular: "",
   contacto: "",
   fechaNacimiento: "",
   correo: "",
@@ -26,12 +33,7 @@ const ETIQUETAS_PAGO = {
   efectivo: "Efectivo",
   transferencia: "Transferencia",
   tarjeta: "Tarjeta",
-  fiado: "Fiado",
 }
-
-const FORMATEADOR_MONTO = new Intl.NumberFormat("es-PY", {
-  maximumFractionDigits: 0,
-})
 
 function Clientes({ negocioId }) {
   const temporizadorMensaje = useRef(null)
@@ -120,7 +122,6 @@ function Clientes({ negocioId }) {
 
         return [
           cliente.nombre,
-          cliente.celular,
           cliente.contacto,
           cliente.correo,
           cliente.ruc,
@@ -164,7 +165,7 @@ function Clientes({ negocioId }) {
   function actualizarFormulario(campo, valor) {
     setFormulario((formularioActual) => ({
       ...formularioActual,
-      valor,
+      [campo]: valor,
     }))
   }
 
@@ -200,7 +201,6 @@ function Clientes({ negocioId }) {
 
     setFormulario({
       nombre: cliente.nombre || "",
-      celular: cliente.celular || "",
       contacto: cliente.contacto || "",
       fechaNacimiento: cliente.fecha_nacimiento || "",
       correo: cliente.correo || "",
@@ -240,7 +240,6 @@ function Clientes({ negocioId }) {
 
     const datos = {
       nombre: formulario.nombre.trim(),
-      celular: formulario.celular.trim() || null,
       contacto: formulario.contacto.trim() || null,
       fecha_nacimiento: formulario.fechaNacimiento || null,
       correo: formulario.correo.trim() || null,
@@ -408,18 +407,18 @@ function Clientes({ negocioId }) {
 
             <div className="fila-form">
               <div className="campo">
-                <label htmlFor="cliente-celular">
-                  Celular
+                <label htmlFor="cliente-contacto">
+                  Contacto / Celular
                 </label>
 
                 <input
-                  id="cliente-celular"
-                  type="tel"
+                  id="cliente-contacto"
+                  type="text"
                   placeholder="0981 000 000"
-                  value={formulario.celular}
+                  value={formulario.contacto}
                   onChange={(evento) =>
                     actualizarFormulario(
-                      "celular",
+                      "contacto",
                       evento.target.value
                     )
                   }
@@ -444,24 +443,6 @@ function Clientes({ negocioId }) {
               </div>
             </div>
 
-            <div className="campo">
-              <label htmlFor="cliente-contacto">
-                Contacto
-              </label>
-
-              <input
-                id="cliente-contacto"
-                type="text"
-                value={formulario.contacto}
-                onChange={(evento) =>
-                  actualizarFormulario(
-                    "contacto",
-                    evento.target.value
-                  )
-                }
-              />
-            </div>
-
             <div className="fila-form">
               <div className="campo">
                 <label htmlFor="cliente-correo">Correo</label>
@@ -469,7 +450,6 @@ function Clientes({ negocioId }) {
                 <input
                   id="cliente-correo"
                   type="email"
-                  
                   value={formulario.correo}
                   onChange={(evento) =>
                     actualizarFormulario(
@@ -534,7 +514,7 @@ function Clientes({ negocioId }) {
               <input
                 id="buscar-cliente"
                 type="search"
-                placeholder="Nombre, celular, correo o RUC"
+                placeholder="Nombre, contacto, correo o RUC"
                 value={busqueda}
                 onChange={(evento) =>
                   setBusqueda(evento.target.value)
@@ -584,9 +564,8 @@ function Clientes({ negocioId }) {
                       </span>
 
                       <span className="detalle-cliente">
-                        {cliente.celular ||
+                        {cliente.contacto ||
                           cliente.correo ||
-                          cliente.contacto ||
                           "Sin datos de contacto"}
                       </span>
                     </span>
@@ -680,11 +659,6 @@ function Clientes({ negocioId }) {
 
               <div className="datos-cliente">
                 <DatoCliente
-                  etiqueta="Celular"
-                  valor={clienteSeleccionado.celular}
-                />
-
-                <DatoCliente
                   etiqueta="Contacto"
                   valor={clienteSeleccionado.contacto}
                 />
@@ -702,7 +676,7 @@ function Clientes({ negocioId }) {
                 <DatoCliente
                   etiqueta="Nacimiento"
                   valor={formatearFecha(
-                    clienteSeleccionado.fecha_nacimiento
+                    clienteSeleccionado.fecha_nacimiento, "Sin registro"
                   )}
                 />
               </div>
@@ -739,7 +713,7 @@ function Clientes({ negocioId }) {
                     <Metrica
                       etiqueta="Última compra"
                       valor={formatearFecha(
-                        estadisticas.ultimaCompra
+                        estadisticas.ultimaCompra, "Sin registro"
                       )}
                     />
                   </div>
@@ -824,64 +798,6 @@ function Metrica({ etiqueta, valor, destacada = false }) {
       <span className="stat-etiqueta">{etiqueta}</span>
     </div>
   )
-}
-
-function normalizarTexto(valor = "") {
-  return String(valor)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-}
-
-function convertirNumero(valor) {
-  const numero = Number(valor)
-  return Number.isFinite(numero) ? numero : 0
-}
-
-function formatearMonto(valor) {
-  return FORMATEADOR_MONTO.format(convertirNumero(valor))
-}
-
-function formatearCantidad(valor) {
-  return FORMATEADOR_MONTO.format(convertirNumero(valor))
-}
-
-function formatearFecha(fecha) {
-  if (!fecha) return "Sin registro"
-
-  const [anio, mes, dia] = String(fecha)
-    .split("T")[0]
-    .split("-")
-    .map(Number)
-
-  if (!anio || !mes || !dia) {
-    return String(fecha)
-  }
-
-  return new Date(anio, mes - 1, dia).toLocaleDateString(
-    "es-PY",
-    {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }
-  )
-}
-
-function obtenerIniciales(nombre = "") {
-  const palabras = String(nombre)
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-
-  if (palabras.length === 0) return "?"
-
-  if (palabras.length === 1) {
-    return palabras[0].slice(0, 2).toUpperCase()
-  }
-
-  return `${palabras[0][0]}${palabras[1][0]}`.toUpperCase()
 }
 
 function esCorreoValido(correo) {

@@ -7,6 +7,14 @@ import {
 } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { apiDelete, apiGet, apiPost } from "../api/client"
+import {
+  normalizarTexto,
+  convertirNumero,
+  convertirFechaLocal,
+  obtenerFechaActual,
+  formatearFecha,
+  formatearMontoDecimal,
+} from "../utils"
 
 const FILTROS_VENTA = {
   HOY: "hoy",
@@ -23,58 +31,6 @@ const METODOS_PAGO = {
 const ETIQUETAS_PAGO = {
   efectivo: "Efectivo",
   transferencia: "Transferencia",
-}
-
-const MONEDA = new Intl.NumberFormat("es-PY", {
-  maximumFractionDigits: 2,
-})
-
-function obtenerFechaActual() {
-  const ahora = new Date()
-  const diferenciaZonaHoraria = ahora.getTimezoneOffset() * 60_000
-
-  return new Date(ahora.getTime() - diferenciaZonaHoraria)
-    .toISOString()
-    .split("T")[0]
-}
-
-function normalizarTexto(valor = "") {
-  return String(valor)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-}
-
-function convertirNumero(valor, valorPredeterminado = 0) {
-  const numero = Number(valor)
-
-  return Number.isFinite(numero) ? numero : valorPredeterminado
-}
-
-function convertirFechaLocal(fecha) {
-  if (!fecha) return null
-
-  const [anio, mes, dia] = String(fecha)
-    .split("T")[0]
-    .split("-")
-    .map(Number)
-
-  if (!anio || !mes || !dia) return null
-
-  return new Date(anio, mes - 1, dia)
-}
-
-function formatearFecha(fecha) {
-  const fechaLocal = convertirFechaLocal(fecha)
-
-  if (!fechaLocal) return "Sin fecha"
-
-  return fechaLocal.toLocaleDateString("es-PY", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
 }
 
 function prepararCarritoInicial(carritoInicial) {
@@ -410,7 +366,7 @@ function Ventas({ negocioId }) {
   }
 
   function formatearMonto(monto) {
-    return MONEDA.format(convertirNumero(monto))
+    return formatearMontoDecimal(monto)
   }
 
   function etiquetaMetodoPago(metodo) {

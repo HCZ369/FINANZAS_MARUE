@@ -12,6 +12,14 @@ import {
   apiPost,
   apiPut,
 } from "../api/client"
+import {
+  normalizarTexto,
+  convertirNumero,
+  convertirFechaLocal,
+  obtenerFechaActual,
+  formatearFecha,
+  formatearMonto,
+} from "../utils"
 
 const FILTROS = {
   HOY: "hoy",
@@ -26,10 +34,6 @@ const FORMULARIO_INICIAL = {
   fecha: obtenerFechaActual(),
   descripcion: "",
 }
-
-const FORMATEADOR_MONTO = new Intl.NumberFormat("es-PY", {
-  maximumFractionDigits: 0,
-})
 
 function Gastos({ negocioId }) {
   const temporizadorMensaje = useRef(null)
@@ -194,7 +198,7 @@ function Gastos({ negocioId }) {
   function actualizarFormulario(campo, valor) {
     setFormulario((formularioActual) => ({
       ...formularioActual,
-      valor,
+      [campo]: valor,
     }))
   }
 
@@ -699,58 +703,6 @@ function obtenerNombreCategoria(id, categoriasPorId) {
     categoriasPorId.get(String(id))?.nombre ||
     "Sin categoría"
   )
-}
-
-function obtenerFechaActual() {
-  const ahora = new Date()
-  const desplazamiento = ahora.getTimezoneOffset() * 60_000
-
-  return new Date(ahora.getTime() - desplazamiento)
-    .toISOString()
-    .split("T")[0]
-}
-
-function convertirFechaLocal(fecha) {
-  if (!fecha) return null
-
-  const [anio, mes, dia] = String(fecha)
-    .split("T")[0]
-    .split("-")
-    .map(Number)
-
-  if (!anio || !mes || !dia) return null
-
-  return new Date(anio, mes - 1, dia)
-}
-
-function formatearFecha(fecha) {
-  const fechaLocal = convertirFechaLocal(fecha)
-
-  if (!fechaLocal) return "Sin fecha"
-
-  return fechaLocal.toLocaleDateString("es-PY", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
-}
-
-function normalizarTexto(valor = "") {
-  return String(valor)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-}
-
-function convertirNumero(valor) {
-  const numero = Number(valor)
-
-  return Number.isFinite(numero) ? numero : 0
-}
-
-function formatearMonto(valor) {
-  return FORMATEADOR_MONTO.format(convertirNumero(valor))
 }
 
 export default Gastos

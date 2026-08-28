@@ -13,6 +13,16 @@ import {
   apiPost,
   apiPut,
 } from "../api/client"
+import {
+  normalizarTexto,
+  convertirNumero,
+  valorParaInput,
+  formatearFecha,
+  formatearMonto,
+  formatearDecimal,
+  formatearCantidad,
+  obtenerIniciales,
+} from "../utils"
 
 const LIMITE_STOCK_BAJO = 10
 
@@ -40,14 +50,6 @@ const FORMULARIO_INICIAL = {
   imagenUrl: "",
 }
 
-const FORMATEADOR_MONTO = new Intl.NumberFormat("es-PY", {
-  maximumFractionDigits: 0,
-})
-
-const FORMATEADOR_DECIMAL = new Intl.NumberFormat("es-PY", {
-  maximumFractionDigits: 2,
-})
-
 function Catalogo({ negocioId }) {
   const navigate = useNavigate()
   const temporizadorMensaje = useRef(null)
@@ -57,9 +59,7 @@ function Catalogo({ negocioId }) {
   const [lotes, setLotes] = useState([])
 
   const [busqueda, setBusqueda] = useState("")
-  const [filtroStock, setFiltroStock] = useState(
-    FILTROS_STOCK.TODOS
-  )
+  const [filtroStock, setFiltroStock] = useState(FILTROS_STOCK.TODOS)
   const [ordenar, setOrdenar] = useState(ORDENES.NOMBRE)
 
   const [seleccionados, setSeleccionados] = useState({})
@@ -73,8 +73,7 @@ function Catalogo({ negocioId }) {
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [eliminando, setEliminando] = useState(false)
-  const [calculandoSugerencia, setCalculandoSugerencia] =
-    useState(false)
+  const [calculandoSugerencia, setCalculandoSugerencia] = useState(false)
 
   const mostrarMensaje = useCallback((texto, tipo = "exito") => {
     if (temporizadorMensaje.current) {
@@ -102,23 +101,17 @@ function Catalogo({ negocioId }) {
     try {
       setCargando(true)
 
-      const [productosData, stockData, lotesData] =
-        await Promise.all([
-          apiGet(`/negocios/${negocioId}/productos/`),
-          apiGet(`/negocios/${negocioId}/stock/`),
-          apiGet(`/negocios/${negocioId}/lotes/`),
-        ])
+      const [productosData, stockData, lotesData] = await Promise.all([
+        apiGet(`/negocios/${negocioId}/productos/`),
+        apiGet(`/negocios/${negocioId}/stock/`),
+        apiGet(`/negocios/${negocioId}/lotes/`),
+      ])
 
-      setProductos(
-        Array.isArray(productosData) ? productosData : []
-      )
+      setProductos(Array.isArray(productosData) ? productosData : [])
       setStock(Array.isArray(stockData) ? stockData : [])
       setLotes(Array.isArray(lotesData) ? lotesData : [])
     } catch (error) {
-      mostrarMensaje(
-        error?.message || "No se pudo cargar el catálogo.",
-        "error"
-      )
+      mostrarMensaje(error?.message || "No se pudo cargar el catálogo.", "error")
     } finally {
       setCargando(false)
     }
@@ -165,9 +158,7 @@ function Catalogo({ negocioId }) {
 
   const productosCompletos = useMemo(() => {
     return productos.map((producto) => {
-      const informacionStock = stockPorProducto.get(
-        String(producto.id)
-      ) || {
+      const informacionStock = stockPorProducto.get(String(producto.id)) || {
         stock: 0,
         comprado: 0,
         vendido: 0,
@@ -191,8 +182,7 @@ function Catalogo({ negocioId }) {
 
     return (
       productosCompletos.find(
-        (producto) =>
-          String(producto.id) === String(productoAbiertoId)
+        (producto) => String(producto.id) === String(productoAbiertoId)
       ) || null
     )
   }, [productoAbiertoId, productosCompletos])
@@ -207,12 +197,7 @@ function Catalogo({ negocioId }) {
 
         return resultado
       },
-      {
-        total: 0,
-        disponible: 0,
-        bajo: 0,
-        agotado: 0,
-      }
+      { total: 0, disponible: 0, bajo: 0, agotado: 0 }
     )
   }, [productosCompletos])
 
@@ -222,24 +207,17 @@ function Catalogo({ negocioId }) {
     return productosCompletos
       .filter((producto) => {
         const coincideBusqueda =
-          !termino ||
-          normalizarTexto(producto.nombre).includes(termino)
+          !termino || normalizarTexto(producto.nombre).includes(termino)
 
         const estado = obtenerEstadoStock(producto.stock)
 
         const coincideEstado =
-          filtroStock === FILTROS_STOCK.TODOS ||
-          estado === filtroStock
+          filtroStock === FILTROS_STOCK.TODOS || estado === filtroStock
 
         return coincideBusqueda && coincideEstado
       })
       .sort((a, b) => ordenarProductos(a, b, ordenar))
-  }, [
-    productosCompletos,
-    busqueda,
-    filtroStock,
-    ordenar,
-  ])
+  }, [productosCompletos, busqueda, filtroStock, ordenar])
 
   const resumenSeleccion = useMemo(() => {
     const items = Object.values(seleccionados)
@@ -248,8 +226,7 @@ function Catalogo({ negocioId }) {
       items,
       productos: items.length,
       unidades: items.reduce(
-        (total, item) =>
-          total + Math.max(1, convertirNumero(item.cantidad, 1)),
+        (total, item) => total + Math.max(1, convertirNumero(item.cantidad, 1)),
         0
       ),
       total: items.reduce(
@@ -272,7 +249,7 @@ function Catalogo({ negocioId }) {
   function actualizarFormulario(campo, valor) {
     setFormulario((formularioActual) => ({
       ...formularioActual,
-      valor,
+      [campo]: valor,
     }))
 
     if (
@@ -303,9 +280,7 @@ function Catalogo({ negocioId }) {
       precio: valorParaInput(producto.precio),
       loteId: valorParaInput(producto.lote_id),
       costoUsd: valorParaInput(producto.costo_usd),
-      cantidadComprada: valorParaInput(
-        producto.cantidad_comprada
-      ),
+      cantidadComprada: valorParaInput(producto.cantidad_comprada),
       imagenUrl: producto.imagen_url || "",
     })
 
@@ -329,10 +304,7 @@ function Catalogo({ negocioId }) {
     evento.stopPropagation()
 
     if (producto.stock <= 0) {
-      mostrarMensaje(
-        `"${producto.nombre}" no tiene stock disponible.`,
-        "error"
-      )
+      mostrarMensaje(`"${producto.nombre}" no tiene stock disponible.`, "error")
       return
     }
 
@@ -364,9 +336,7 @@ function Catalogo({ negocioId }) {
     if (resumenSeleccion.items.length === 0) return
 
     navigate("/ventas", {
-      state: {
-        carritoInicial: resumenSeleccion.items,
-      },
+      state: { carritoInicial: resumenSeleccion.items },
     })
   }
 
@@ -426,9 +396,7 @@ function Catalogo({ negocioId }) {
         sugerencia?.costo_unitario != null
           ? convertirNumero(sugerencia.costo_unitario)
           : null,
-      lote_id: formulario.loteId
-        ? Number(formulario.loteId)
-        : null,
+      lote_id: formulario.loteId ? Number(formulario.loteId) : null,
       costo_usd:
         formulario.costoUsd !== ""
           ? convertirNumero(formulario.costoUsd)
@@ -445,10 +413,7 @@ function Catalogo({ negocioId }) {
 
       const resultado =
         modalFormulario === "crear"
-          ? await apiPost(
-              `/negocios/${negocioId}/productos/`,
-              datos
-            )
+          ? await apiPost(`/negocios/${negocioId}/productos/`, datos)
           : await apiPut(
               `/negocios/${negocioId}/productos/${productoAbiertoId}/`,
               datos
@@ -495,8 +460,7 @@ function Catalogo({ negocioId }) {
 
       setStock((stockActual) =>
         stockActual.filter(
-          (item) =>
-            String(item.producto_id) !== String(producto.id)
+          (item) => String(item.producto_id) !== String(producto.id)
         )
       )
 
@@ -528,10 +492,7 @@ function Catalogo({ negocioId }) {
     }
 
     if (convertirNumero(formulario.costoUsd) <= 0) {
-      mostrarMensaje(
-        "Ingresá un costo en USD mayor que cero.",
-        "error"
-      )
+      mostrarMensaje("Ingresá un costo en USD mayor que cero.", "error")
       return
     }
 
@@ -549,15 +510,11 @@ function Catalogo({ negocioId }) {
       setSugerencia(resultado)
 
       if (resultado?.precio_sugerido != null) {
-        actualizarFormulario(
-          "precio",
-          String(resultado.precio_sugerido)
-        )
+        actualizarFormulario("precio", String(resultado.precio_sugerido))
       }
     } catch (error) {
       mostrarMensaje(
-        error?.message ||
-          "No se pudo calcular la sugerencia de precio.",
+        error?.message || "No se pudo calcular la sugerencia de precio.",
         "error"
       )
     } finally {
@@ -614,9 +571,7 @@ function Catalogo({ negocioId }) {
       {mensaje && (
         <div
           className={
-            mensaje.tipo === "error"
-              ? "msg msg-error"
-              : "msg msg-exito"
+            mensaje.tipo === "error" ? "msg msg-error" : "msg msg-exito"
           }
           role={mensaje.tipo === "error" ? "alert" : "status"}
         >
@@ -639,26 +594,20 @@ function Catalogo({ negocioId }) {
       >
         <div className="cat-toolbar">
           <div className="cat-buscador">
-            <label htmlFor="buscar-catalogo">
-              Buscar producto
-            </label>
+            <label htmlFor="buscar-catalogo">Buscar producto</label>
 
             <input
               id="buscar-catalogo"
               type="search"
               placeholder="Nombre del producto"
               value={busqueda}
-              onChange={(evento) =>
-                setBusqueda(evento.target.value)
-              }
+              onChange={(evento) => setBusqueda(evento.target.value)}
               className="cat-input-busqueda"
             />
           </div>
 
           <div className="cat-filtros">
-            <span className="cat-control-etiqueta">
-              Disponibilidad
-            </span>
+            <span className="cat-control-etiqueta">Disponibilidad</span>
 
             <div
               className="filtros-stock"
@@ -666,38 +615,28 @@ function Catalogo({ negocioId }) {
             >
               <BotonFiltro
                 activo={filtroStock === FILTROS_STOCK.TODOS}
-                onClick={() =>
-                  setFiltroStock(FILTROS_STOCK.TODOS)
-                }
+                onClick={() => setFiltroStock(FILTROS_STOCK.TODOS)}
               >
                 Todos {conteos.total}
               </BotonFiltro>
 
               <BotonFiltro
-                activo={
-                  filtroStock === FILTROS_STOCK.DISPONIBLE
-                }
-                onClick={() =>
-                  setFiltroStock(FILTROS_STOCK.DISPONIBLE)
-                }
+                activo={filtroStock === FILTROS_STOCK.DISPONIBLE}
+                onClick={() => setFiltroStock(FILTROS_STOCK.DISPONIBLE)}
               >
                 Disponible {conteos.disponible}
               </BotonFiltro>
 
               <BotonFiltro
                 activo={filtroStock === FILTROS_STOCK.BAJO}
-                onClick={() =>
-                  setFiltroStock(FILTROS_STOCK.BAJO)
-                }
+                onClick={() => setFiltroStock(FILTROS_STOCK.BAJO)}
               >
                 Bajo {conteos.bajo}
               </BotonFiltro>
 
               <BotonFiltro
                 activo={filtroStock === FILTROS_STOCK.AGOTADO}
-                onClick={() =>
-                  setFiltroStock(FILTROS_STOCK.AGOTADO)
-                }
+                onClick={() => setFiltroStock(FILTROS_STOCK.AGOTADO)}
               >
                 Agotado {conteos.agotado}
               </BotonFiltro>
@@ -714,18 +653,10 @@ function Catalogo({ negocioId }) {
               onChange={(evento) => setOrdenar(evento.target.value)}
             >
               <option value={ORDENES.NOMBRE}>Nombre A-Z</option>
-              <option value={ORDENES.PRECIO_ASC}>
-                Menor precio
-              </option>
-              <option value={ORDENES.PRECIO_DESC}>
-                Mayor precio
-              </option>
-              <option value={ORDENES.STOCK_ASC}>
-                Menor stock
-              </option>
-              <option value={ORDENES.STOCK_DESC}>
-                Mayor stock
-              </option>
+              <option value={ORDENES.PRECIO_ASC}>Menor precio</option>
+              <option value={ORDENES.PRECIO_DESC}>Mayor precio</option>
+              <option value={ORDENES.STOCK_ASC}>Menor stock</option>
+              <option value={ORDENES.STOCK_DESC}>Mayor stock</option>
             </select>
           </div>
         </div>
@@ -756,13 +687,9 @@ function Catalogo({ negocioId }) {
             <TarjetaProducto
               key={producto.id}
               producto={producto}
-              seleccionado={
-                seleccionados[String(producto.id)] != null
-              }
+              seleccionado={seleccionados[String(producto.id)] != null}
               onAbrir={() => abrirDetalle(producto)}
-              onSeleccionar={(evento) =>
-                alternarSeleccion(producto, evento)
-              }
+              onSeleccionar={(evento) => alternarSeleccion(producto, evento)}
             />
           ))}
         </div>
@@ -777,9 +704,7 @@ function Catalogo({ negocioId }) {
             productosCompletos.length === 0
               ? "Creá el primer producto para comenzar a utilizar el catálogo."
               : `No hay coincidencias para los filtros seleccionados${
-                  busqueda.trim()
-                    ? ` y la búsqueda "${busqueda.trim()}"`
-                    : ""
+                  busqueda.trim() ? ` y la búsqueda "${busqueda.trim()}"` : ""
                 }.`
           }
           mostrarBoton={productosCompletos.length === 0}
@@ -793,14 +718,11 @@ function Catalogo({ negocioId }) {
           <div className="cat-seleccion-resumen">
             <span className="cat-seleccion-cantidad">
               {resumenSeleccion.productos}{" "}
-              {resumenSeleccion.productos === 1
-                ? "producto"
-                : "productos"}
+              {resumenSeleccion.productos === 1 ? "producto" : "productos"}
             </span>
 
             <span className="cat-seleccion-total">
-              Total estimado:{" "}
-              {formatearMonto(resumenSeleccion.total)}
+              Total estimado: {formatearMonto(resumenSeleccion.total)}
             </span>
           </div>
 
@@ -853,12 +775,7 @@ function Catalogo({ negocioId }) {
   )
 }
 
-function TarjetaProducto({
-  producto,
-  seleccionado,
-  onAbrir,
-  onSeleccionar,
-}) {
+function TarjetaProducto({ producto, seleccionado, onAbrir, onSeleccionar }) {
   const estaAgotado = producto.stock <= 0
   const estado = obtenerEstadoStock(producto.stock)
 
@@ -886,11 +803,13 @@ function TarjetaProducto({
     >
       <div
         className="cat-card-visual"
-        style={{
-          backgroundColor: obtenerColorProducto(producto.nombre),
-        }}
+        style={{ backgroundColor: obtenerColorProducto(producto.nombre) }}
       >
-        {producto.imagen_url}
+        <ImagenProducto
+          src={producto.imagen_url}
+          alt={producto.nombre}
+          className="cat-card-imagen"
+        />
 
         <span className="cat-card-inicial" aria-hidden="true">
           {obtenerIniciales(producto.nombre)}
@@ -930,10 +849,7 @@ function TarjetaProducto({
       </div>
 
       <div className="cat-card-info">
-        <span
-          className="cat-card-nombre"
-          title={producto.nombre}
-        >
+        <span className="cat-card-nombre" title={producto.nombre}>
           {producto.nombre}
         </span>
 
@@ -944,9 +860,7 @@ function TarjetaProducto({
 
           <span className="cat-card-vendidos">
             {producto.vendido > 0
-              ? `${formatearCantidad(
-                  producto.vendido
-                )} vendidos`
+              ? `${formatearCantidad(producto.vendido)} vendidos`
               : "Sin ventas"}
           </span>
         </div>
@@ -972,11 +886,13 @@ function ModalProducto({
     >
       <div
         className="cat-detalle-visual"
-        style={{
-          backgroundColor: obtenerColorProducto(producto.nombre),
-        }}
+        style={{ backgroundColor: obtenerColorProducto(producto.nombre) }}
       >
-        {producto.imagen_url}
+        <ImagenProducto
+          src={producto.imagen_url}
+          alt={producto.nombre}
+          className="cat-detalle-imagen"
+        />
 
         <span className="cat-detalle-inicial" aria-hidden="true">
           {obtenerIniciales(producto.nombre)}
@@ -1024,19 +940,13 @@ function ModalProducto({
         <div className="dato">
           <span className="etiqueta">Lote</span>
           <span className="valor">
-            {producto.lote_id
-              ? `Lote ${producto.lote_id}`
-              : "Sin lote"}
+            {producto.lote_id ? `Lote ${producto.lote_id}` : "Sin lote"}
           </span>
         </div>
       </div>
 
       <div className="cat-detalle-acciones">
-        <button
-          type="button"
-          className="btn-principal"
-          onClick={onEditar}
-        >
+        <button type="button" className="btn-principal" onClick={onEditar}>
           Editar producto
         </button>
 
@@ -1074,10 +984,7 @@ function ModalFormularioProducto({
       etiqueta={esCreacion ? "Crear registro" : "Modificar registro"}
       onCerrar={onCerrar}
     >
-      <form
-        className="cat-form-edicion"
-        onSubmit={onGuardar}
-      >
+      <form className="cat-form-edicion" onSubmit={onGuardar}>
         <div className="campo">
           <label htmlFor="producto-nombre">Nombre</label>
 
@@ -1085,9 +992,7 @@ function ModalFormularioProducto({
             id="producto-nombre"
             type="text"
             value={formulario.nombre}
-            onChange={(evento) =>
-              onCambiar("nombre", evento.target.value)
-            }
+            onChange={(evento) => onCambiar("nombre", evento.target.value)}
             placeholder="Nombre del producto"
             maxLength={150}
             autoFocus
@@ -1096,23 +1001,22 @@ function ModalFormularioProducto({
         </div>
 
         <div className="campo">
-          <label htmlFor="producto-imagen">
-            URL de imagen
-          </label>
+          <label htmlFor="producto-imagen">URL de imagen</label>
 
           <input
             id="producto-imagen"
             type="url"
             value={formulario.imagenUrl}
-            onChange={(evento) =>
-              onCambiar("imagenUrl", evento.target.value)
-            }
+            onChange={(evento) => onCambiar("imagenUrl", evento.target.value)}
             placeholder="https://ejemplo.com/producto.jpg"
           />
 
           {formulario.imagenUrl.trim() && (
             <div className="cat-preview-img">
-              {formulario.imagenUrl}
+              <ImagenProducto
+                src={formulario.imagenUrl}
+                alt="Vista previa"
+              />
             </div>
           )}
         </div>
@@ -1124,9 +1028,7 @@ function ModalFormularioProducto({
             <select
               id="producto-lote"
               value={formulario.loteId}
-              onChange={(evento) =>
-                onCambiar("loteId", evento.target.value)
-              }
+              onChange={(evento) => onCambiar("loteId", evento.target.value)}
             >
               <option value="">Sin lote</option>
 
@@ -1140,9 +1042,7 @@ function ModalFormularioProducto({
           </div>
 
           <div className="campo">
-            <label htmlFor="producto-costo">
-              Costo en USD
-            </label>
+            <label htmlFor="producto-costo">Costo en USD</label>
 
             <input
               id="producto-costo"
@@ -1150,9 +1050,7 @@ function ModalFormularioProducto({
               min="0"
               step="any"
               value={formulario.costoUsd}
-              onChange={(evento) =>
-                onCambiar("costoUsd", evento.target.value)
-              }
+              onChange={(evento) => onCambiar("costoUsd", evento.target.value)}
               placeholder="0.00"
             />
           </div>
@@ -1160,9 +1058,7 @@ function ModalFormularioProducto({
 
         <div className="grid-form-config">
           <div className="campo">
-            <label htmlFor="producto-cantidad">
-              Cantidad comprada
-            </label>
+            <label htmlFor="producto-cantidad">Cantidad comprada</label>
 
             <input
               id="producto-cantidad"
@@ -1171,19 +1067,14 @@ function ModalFormularioProducto({
               step="1"
               value={formulario.cantidadComprada}
               onChange={(evento) =>
-                onCambiar(
-                  "cantidadComprada",
-                  evento.target.value
-                )
+                onCambiar("cantidadComprada", evento.target.value)
               }
               placeholder="0"
             />
           </div>
 
           <div className="campo campo-accion">
-            <span className="label-control">
-              Sugerencia de precio
-            </span>
+            <span className="label-control">Sugerencia de precio</span>
 
             <button
               type="button"
@@ -1195,9 +1086,7 @@ function ModalFormularioProducto({
                 convertirNumero(formulario.costoUsd) <= 0
               }
             >
-              {calculandoSugerencia
-                ? "Calculando..."
-                : "Calcular sugerencia"}
+              {calculandoSugerencia ? "Calculando..." : "Calcular sugerencia"}
             </button>
           </div>
         </div>
@@ -1206,9 +1095,7 @@ function ModalFormularioProducto({
           <div className="caja-sugerencia">
             <div>
               <span>Costo unitario</span>
-              <strong>
-                {formatearMonto(sugerencia.costo_unitario)}
-              </strong>
+              <strong>{formatearMonto(sugerencia.costo_unitario)}</strong>
             </div>
 
             <div>
@@ -1218,9 +1105,7 @@ function ModalFormularioProducto({
 
             <div>
               <span>Precio sugerido</span>
-              <strong>
-                {formatearMonto(sugerencia.precio_sugerido)}
-              </strong>
+              <strong>{formatearMonto(sugerencia.precio_sugerido)}</strong>
             </div>
           </div>
         )}
@@ -1234,9 +1119,7 @@ function ModalFormularioProducto({
             min="0.01"
             step="any"
             value={formulario.precio}
-            onChange={(evento) =>
-              onCambiar("precio", evento.target.value)
-            }
+            onChange={(evento) => onCambiar("precio", evento.target.value)}
             placeholder="0"
             required
           />
@@ -1289,9 +1172,7 @@ function Modal({ titulo, etiqueta, children, onCerrar }) {
         <div className="modal-cabecera">
           <div>
             {etiqueta && (
-              <span className="modal-etiqueta">
-                {etiqueta}
-              </span>
+              <span className="modal-etiqueta">{etiqueta}</span>
             )}
 
             <h3 id="titulo-modal-producto">{titulo}</h3>
@@ -1313,12 +1194,7 @@ function Modal({ titulo, etiqueta, children, onCerrar }) {
   )
 }
 
-function MetricaProducto({
-  valor,
-  etiqueta,
-  destacada = false,
-  estado = "",
-}) {
+function MetricaProducto({ valor, etiqueta, destacada = false, estado = "" }) {
   return (
     <div
       className={[
@@ -1344,18 +1220,14 @@ function EstadoCatalogo({
 }) {
   return (
     <section className="cat-vacio">
-      <span className="cat-vacio-simbolo" aria-hidden="true">
-        +
-      </span>
+      <span className="cat-vacio-simbolo" aria-hidden="true">+</span>
 
       <h2>{titulo}</h2>
       <p>{descripcion}</p>
 
       <button
         type="button"
-        className={
-          mostrarBoton ? "btn-principal" : "btn-secundario"
-        }
+        className={mostrarBoton ? "btn-principal" : "btn-secundario"}
         onClick={mostrarBoton ? onCrear : onLimpiar}
       >
         {mostrarBoton ? "Crear producto" : "Limpiar filtros"}
@@ -1398,6 +1270,7 @@ function ImagenProducto({ src, alt, className = "" }) {
     />
   )
 }
+
 function obtenerEstadoStock(cantidad) {
   const stock = convertirNumero(cantidad)
 
@@ -1417,90 +1290,12 @@ function obtenerTextoEstado(cantidad) {
 }
 
 function ordenarProductos(a, b, orden) {
-  if (orden === ORDENES.PRECIO_ASC) {
-    return a.precio - b.precio
-  }
+  if (orden === ORDENES.PRECIO_ASC) return a.precio - b.precio
+  if (orden === ORDENES.PRECIO_DESC) return b.precio - a.precio
+  if (orden === ORDENES.STOCK_ASC) return a.stock - b.stock
+  if (orden === ORDENES.STOCK_DESC) return b.stock - a.stock
 
-  if (orden === ORDENES.PRECIO_DESC) {
-    return b.precio - a.precio
-  }
-
-  if (orden === ORDENES.STOCK_ASC) {
-    return a.stock - b.stock
-  }
-
-  if (orden === ORDENES.STOCK_DESC) {
-    return b.stock - a.stock
-  }
-
-  return a.nombre.localeCompare(b.nombre, "es", {
-    sensitivity: "base",
-  })
-}
-
-function normalizarTexto(valor = "") {
-  return String(valor)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-}
-
-function convertirNumero(valor, predeterminado = 0) {
-  const numero = Number(valor)
-
-  return Number.isFinite(numero) ? numero : predeterminado
-}
-
-function valorParaInput(valor) {
-  return valor === null || valor === undefined ? "" : String(valor)
-}
-
-function formatearMonto(valor) {
-  return FORMATEADOR_MONTO.format(convertirNumero(valor))
-}
-
-function formatearDecimal(valor) {
-  return FORMATEADOR_DECIMAL.format(convertirNumero(valor))
-}
-
-function formatearCantidad(valor) {
-  return FORMATEADOR_MONTO.format(convertirNumero(valor))
-}
-
-function formatearFecha(fecha) {
-  if (!fecha) return "Sin fecha"
-
-  const [anio, mes, dia] = String(fecha)
-    .split("T")[0]
-    .split("-")
-    .map(Number)
-
-  if (!anio || !mes || !dia) return String(fecha)
-
-  return new Date(anio, mes - 1, dia).toLocaleDateString(
-    "es-PY",
-    {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }
-  )
-}
-
-function obtenerIniciales(nombre) {
-  const palabras = String(nombre)
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-
-  if (palabras.length === 0) return "?"
-
-  if (palabras.length === 1) {
-    return palabras[0].slice(0, 2).toUpperCase()
-  }
-
-  return `${palabras[0][0]}${palabras[1][0]}`.toUpperCase()
+  return a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" })
 }
 
 function obtenerColorProducto(nombre) {
@@ -1516,9 +1311,7 @@ function obtenerColorProducto(nombre) {
   let hash = 0
 
   for (let indice = 0; indice < nombre.length; indice += 1) {
-    hash =
-      nombre.charCodeAt(indice) +
-      ((hash << 5) - hash)
+    hash = nombre.charCodeAt(indice) + ((hash << 5) - hash)
   }
 
   return colores[Math.abs(hash) % colores.length]
@@ -1527,7 +1320,6 @@ function obtenerColorProducto(nombre) {
 function esUrlValida(valor) {
   try {
     const url = new URL(valor)
-
     return url.protocol === "http:" || url.protocol === "https:"
   } catch {
     return false

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { apiGet } from "../api/client"
 
-const STOCK_BAJO = -1
+const STOCK_BAJO = 10
 
 function Stock({ negocioId }) {
   const [stock, setStock] = useState([])
