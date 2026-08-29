@@ -17,7 +17,6 @@ const FORM_INICIAL = {
 }
 
 function Configuracion({ negocioId }) {
-  // Datos
   const [datos, setDatos] = useState({
     negocios: [],
     categorias: [],
@@ -26,10 +25,8 @@ function Configuracion({ negocioId }) {
     lotes: [],
   })
 
-  // Formularios (uno por sección)
   const [forms, setForms] = useState(FORM_INICIAL)
 
-  // IDs en edición
   const [editandoId, setEditandoId] = useState({
     negocio: null,
     categoria: null,
@@ -38,14 +35,12 @@ function Configuracion({ negocioId }) {
     producto: null,
   })
 
-  // Estados de UI / carga
   const [cargando, setCargando] = useState(true)
-  const [guardando, setGuardando] = useState(null) // sección que está guardando
-  const [eliminando, setEliminando] = useState(null) // id que se está eliminando
+  const [guardando, setGuardando] = useState(null)
+  const [eliminando, setEliminando] = useState(null)
   const [sugerencia, setSugerencia] = useState(null)
   const [mensaje, setMensaje] = useState({ texto: "", tipo: "exito" })
 
-  // Secciones colapsables (todas abiertas por defecto)
   const [abiertas, setAbiertas] = useState({
     negocios: true,
     categorias: true,
@@ -114,18 +109,15 @@ function Configuracion({ negocioId }) {
         ? await apiPut(`${urlBase}${id}/`, payload)
         : await apiPost(urlBase, payload)
 
-      // Actualizar estado local sin recargar todo
       setDatos((prev) => {
         const lista = prev[coleccion]
         if (id) {
-          // Editar: reemplazar el ítem
           const item = resultado.item ?? resultado.data ?? { ...form, id }
           return {
             ...prev,
             [coleccion]: lista.map((x) => (x.id === id ? { ...x, ...item } : x)),
           }
         }
-        // Crear: si el backend devuelve el item, agregarlo; si no, recargar
         const nuevo = resultado.item ?? resultado.data
         if (nuevo && nuevo.id) {
           return { ...prev, [coleccion]: [...lista, nuevo] }
@@ -136,7 +128,6 @@ function Configuracion({ negocioId }) {
       mostrarMsg(resultado.mensaje || "Guardado correctamente")
       resetForm(seccion)
 
-      // Si el backend no devolvió el item nuevo, recargamos como fallback
       if (!id && !(resultado.item || resultado.data)) {
         await cargarDatos()
       }
@@ -164,9 +155,7 @@ function Configuracion({ negocioId }) {
     }
   }
 
-  
   // NEGOCIOS
-  
   function guardarNegocio(e) {
     e.preventDefault()
     guardar({
@@ -191,9 +180,7 @@ function Configuracion({ negocioId }) {
     })
   }
 
-  
   // CATEGORÍAS
-  
   function guardarCategoria(e) {
     e.preventDefault()
     guardar({
@@ -222,9 +209,7 @@ function Configuracion({ negocioId }) {
     })
   }
 
-  
   // INYECCIONES
-  
   function guardarInyeccion(e) {
     e.preventDefault()
     guardar({
@@ -253,9 +238,7 @@ function Configuracion({ negocioId }) {
     })
   }
 
-  
   // LOTES
-  
   function guardarLote(e) {
     e.preventDefault()
     guardar({
@@ -288,9 +271,7 @@ function Configuracion({ negocioId }) {
     })
   }
 
-  
   // PRODUCTOS
-  
   function guardarProducto(e) {
     e.preventDefault()
     guardar({
@@ -356,27 +337,7 @@ function Configuracion({ negocioId }) {
     }
   }
 
-  
-  // Subcomponente: tarjeta colapsable
-  
-  function Tarjeta({ id, titulo, children }) {
-    const abierta = abiertas[id]
-    return (
-      <section className={`tarjeta-config ${abierta ? "abierta" : "cerrada"}`}>
-        <header className="tarjeta-header" onClick={() => toggleSeccion(id)}>
-          <h2>{titulo}</h2>
-          <button type="button" className="btn-toggle" aria-label={abierta ? "Colapsar" : "Expandir"}>
-            {abierta ? "▲" : "▼"}
-          </button>
-        </header>
-        {abierta && <div className="tarjeta-body">{children}</div>}
-      </section>
-    )
-  }
-
-  
   // Render
-  
   const formN = forms.negocio
   const formC = forms.categoria
   const formI = forms.inyeccion
@@ -399,12 +360,21 @@ function Configuracion({ negocioId }) {
       {mensaje.texto && (
         <div className={mensaje.tipo === "error" ? "msg msg-error" : "msg msg-exito"}>
           {mensaje.texto}
-          <button className="btn-cerrar-msg" onClick={() => setMensaje({ texto: "", tipo: "exito" })}>×</button>
+          <button
+            className="btn-cerrar-msg"
+            onClick={() => setMensaje({ texto: "", tipo: "exito" })}
+          >
+            ×
+          </button>
         </div>
       )}
 
       {/* NEGOCIOS */}
-      <Tarjeta id="negocios" titulo="Negocios">
+      <Tarjeta
+        titulo="Negocios"
+        abierta={abiertas.negocios}
+        onToggle={() => toggleSeccion("negocios")}
+      >
         <form onSubmit={guardarNegocio}>
           <input
             type="text"
@@ -413,13 +383,21 @@ function Configuracion({ negocioId }) {
             onChange={(e) => actualizarForm("negocio", { nombre: e.target.value })}
           />
           <div className="fila-form">
-            <button type="submit" className="btn-principal" disabled={guardando === "negocio"}>
+            <button
+              type="submit"
+              className="btn-principal"
+              disabled={guardando === "negocio"}
+            >
               {guardando === "negocio"
                 ? "Guardando..."
                 : editandoId.negocio ? "Guardar" : "Crear negocio"}
             </button>
             {editandoId.negocio && (
-              <button type="button" className="btn-secundario" onClick={() => resetForm("negocio")}>
+              <button
+                type="button"
+                className="btn-secundario"
+                onClick={() => resetForm("negocio")}
+              >
                 Cancelar
               </button>
             )}
@@ -430,7 +408,9 @@ function Configuracion({ negocioId }) {
             <div className="fila-item" key={n.id}>
               <span>{n.nombre}</span>
               <div className="acciones">
-                <button className="btn-accion" onClick={() => editarNegocio(n)}>Editar</button>
+                <button className="btn-accion" onClick={() => editarNegocio(n)}>
+                  Editar
+                </button>
                 <button
                   className="btn-borrar"
                   onClick={() => borrarNegocio(n)}
@@ -446,7 +426,11 @@ function Configuracion({ negocioId }) {
       </Tarjeta>
 
       {/* CATEGORÍAS */}
-      <Tarjeta id="categorias" titulo="Categorías">
+      <Tarjeta
+        titulo="Categorías"
+        abierta={abiertas.categorias}
+        onToggle={() => toggleSeccion("categorias")}
+      >
         <form onSubmit={guardarCategoria}>
           <input
             type="text"
@@ -462,13 +446,21 @@ function Configuracion({ negocioId }) {
             <option value="ingreso">Ingreso</option>
           </select>
           <div className="fila-form">
-            <button type="submit" className="btn-principal" disabled={guardando === "categoria"}>
+            <button
+              type="submit"
+              className="btn-principal"
+              disabled={guardando === "categoria"}
+            >
               {guardando === "categoria"
                 ? "Guardando..."
                 : editandoId.categoria ? "Guardar" : "Crear categoría"}
             </button>
             {editandoId.categoria && (
-              <button type="button" className="btn-secundario" onClick={() => resetForm("categoria")}>
+              <button
+                type="button"
+                className="btn-secundario"
+                onClick={() => resetForm("categoria")}
+              >
                 Cancelar
               </button>
             )}
@@ -477,9 +469,13 @@ function Configuracion({ negocioId }) {
         <div className="lista-items">
           {datos.categorias.map((c) => (
             <div className="fila-item" key={c.id}>
-              <span>{c.nombre} <span className="etiqueta-tipo">({c.tipo})</span></span>
+              <span>
+                {c.nombre} <span className="etiqueta-tipo">({c.tipo})</span>
+              </span>
               <div className="acciones">
-                <button className="btn-accion" onClick={() => editarCategoria(c)}>Editar</button>
+                <button className="btn-accion" onClick={() => editarCategoria(c)}>
+                  Editar
+                </button>
                 <button
                   className="btn-borrar"
                   onClick={() => borrarCategoria(c)}
@@ -490,12 +486,18 @@ function Configuracion({ negocioId }) {
               </div>
             </div>
           ))}
-          {datos.categorias.length === 0 && <p className="lista-vacia">Sin categorías</p>}
+          {datos.categorias.length === 0 && (
+            <p className="lista-vacia">Sin categorías</p>
+          )}
         </div>
       </Tarjeta>
 
       {/* INYECCIONES */}
-      <Tarjeta id="inyecciones" titulo="Inyecciones de capital">
+      <Tarjeta
+        titulo="Inyecciones de capital"
+        abierta={abiertas.inyecciones}
+        onToggle={() => toggleSeccion("inyecciones")}
+      >
         <form onSubmit={guardarInyeccion}>
           <div className="grid-form-config">
             <div className="campo">
@@ -526,13 +528,21 @@ function Configuracion({ negocioId }) {
             />
           </div>
           <div className="fila-form">
-            <button type="submit" className="btn-principal" disabled={guardando === "inyeccion"}>
+            <button
+              type="submit"
+              className="btn-principal"
+              disabled={guardando === "inyeccion"}
+            >
               {guardando === "inyeccion"
                 ? "Guardando..."
                 : editandoId.inyeccion ? "Guardar" : "Registrar inyección"}
             </button>
             {editandoId.inyeccion && (
-              <button type="button" className="btn-secundario" onClick={() => resetForm("inyeccion")}>
+              <button
+                type="button"
+                className="btn-secundario"
+                onClick={() => resetForm("inyeccion")}
+              >
                 Cancelar
               </button>
             )}
@@ -546,7 +556,9 @@ function Configuracion({ negocioId }) {
                 {i.nota ? ` (${i.nota})` : ""}
               </span>
               <div className="acciones">
-                <button className="btn-accion" onClick={() => editarInyeccion(i)}>Editar</button>
+                <button className="btn-accion" onClick={() => editarInyeccion(i)}>
+                  Editar
+                </button>
                 <button
                   className="btn-borrar"
                   onClick={() => borrarInyeccion(i)}
@@ -557,12 +569,18 @@ function Configuracion({ negocioId }) {
               </div>
             </div>
           ))}
-          {datos.inyecciones.length === 0 && <p className="lista-vacia">Sin inyecciones</p>}
+          {datos.inyecciones.length === 0 && (
+            <p className="lista-vacia">Sin inyecciones</p>
+          )}
         </div>
       </Tarjeta>
 
       {/* LOTES */}
-      <Tarjeta id="lotes" titulo="Lotes de compra">
+      <Tarjeta
+        titulo="Lotes de compra"
+        abierta={abiertas.lotes}
+        onToggle={() => toggleSeccion("lotes")}
+      >
         <form onSubmit={guardarLote}>
           <div className="grid-form-config">
             <div className="campo">
@@ -593,13 +611,21 @@ function Configuracion({ negocioId }) {
             />
           </div>
           <div className="fila-form">
-            <button type="submit" className="btn-principal" disabled={guardando === "lote"}>
+            <button
+              type="submit"
+              className="btn-principal"
+              disabled={guardando === "lote"}
+            >
               {guardando === "lote"
                 ? "Guardando..."
                 : editandoId.lote ? "Guardar" : "Crear lote"}
             </button>
             {editandoId.lote && (
-              <button type="button" className="btn-secundario" onClick={() => resetForm("lote")}>
+              <button
+                type="button"
+                className="btn-secundario"
+                onClick={() => resetForm("lote")}
+              >
                 Cancelar
               </button>
             )}
@@ -613,7 +639,9 @@ function Configuracion({ negocioId }) {
                 {l.descripcion ? ` (${l.descripcion})` : ""}
               </span>
               <div className="acciones">
-                <button className="btn-accion" onClick={() => editarLote(l)}>Editar</button>
+                <button className="btn-accion" onClick={() => editarLote(l)}>
+                  Editar
+                </button>
                 <button
                   className="btn-borrar"
                   onClick={() => borrarLote(l)}
@@ -629,7 +657,11 @@ function Configuracion({ negocioId }) {
       </Tarjeta>
 
       {/* PRODUCTOS */}
-      <Tarjeta id="productos" titulo="Productos">
+      <Tarjeta
+        titulo="Productos"
+        abierta={abiertas.productos}
+        onToggle={() => toggleSeccion("productos")}
+      >
         <form onSubmit={guardarProducto}>
           <div className="campo">
             <label>Nombre</label>
@@ -673,7 +705,9 @@ function Configuracion({ negocioId }) {
                 type="number"
                 placeholder="0"
                 value={formP.cantidad_comprada}
-                onChange={(e) => actualizarForm("producto", { cantidad_comprada: e.target.value })}
+                onChange={(e) =>
+                  actualizarForm("producto", { cantidad_comprada: e.target.value })
+                }
               />
             </div>
             <div className="campo">
@@ -705,13 +739,21 @@ function Configuracion({ negocioId }) {
             />
           </div>
           <div className="fila-form">
-            <button type="submit" className="btn-principal" disabled={guardando === "producto"}>
+            <button
+              type="submit"
+              className="btn-principal"
+              disabled={guardando === "producto"}
+            >
               {guardando === "producto"
                 ? "Guardando..."
                 : editandoId.producto ? "Guardar" : "Crear producto"}
             </button>
             {editandoId.producto && (
-              <button type="button" className="btn-secundario" onClick={() => resetForm("producto")}>
+              <button
+                type="button"
+                className="btn-secundario"
+                onClick={() => resetForm("producto")}
+              >
                 Cancelar
               </button>
             )}
@@ -720,9 +762,13 @@ function Configuracion({ negocioId }) {
         <div className="lista-items">
           {datos.productos.map((p) => (
             <div className="fila-item" key={p.id}>
-              <span>{p.nombre} — <strong>{formatearMonto(p.precio)}</strong></span>
+              <span>
+                {p.nombre} — <strong>{formatearMonto(p.precio)}</strong>
+              </span>
               <div className="acciones">
-                <button className="btn-accion" onClick={() => editarProducto(p)}>Editar</button>
+                <button className="btn-accion" onClick={() => editarProducto(p)}>
+                  Editar
+                </button>
                 <button
                   className="btn-borrar"
                   onClick={() => borrarProducto(p)}
@@ -733,10 +779,33 @@ function Configuracion({ negocioId }) {
               </div>
             </div>
           ))}
-          {datos.productos.length === 0 && <p className="lista-vacia">Sin productos</p>}
+          {datos.productos.length === 0 && (
+            <p className="lista-vacia">Sin productos</p>
+          )}
         </div>
       </Tarjeta>
     </div>
+  )
+}
+
+
+// Subcomponente: tarjeta colapsable (FUERA del componente principal)
+
+function Tarjeta({ titulo, abierta, onToggle, children }) {
+  return (
+    <section className={`tarjeta-config ${abierta ? "abierta" : "cerrada"}`}>
+      <header className="tarjeta-header" onClick={onToggle}>
+        <h2>{titulo}</h2>
+        <button
+          type="button"
+          className="btn-toggle"
+          aria-label={abierta ? "Colapsar" : "Expandir"}
+        >
+          {abierta ? "▲" : "▼"}
+        </button>
+      </header>
+      {abierta && <div className="tarjeta-body">{children}</div>}
+    </section>
   )
 }
 
