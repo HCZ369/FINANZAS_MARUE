@@ -13,5 +13,7 @@ urlpatterns = [
     path("lotes/<int:lote_id>/", views.LoteDetalleView.as_view(), name="lote_detalle"),
     path("sugerencia-precio/", views.SugerenciaPrecioView.as_view(), name="sugerencia_precio"),
     path("clientes/<int:cliente_id>/ventas/", views.VentasPorClienteView.as_view(), name="ventas_por_cliente"),
-    path("stock/", views.StockView.as_view(), name="stock")
+    path("stock/", views.StockView.as_view(), name="stock"),
+    path("lotes/<int:lote_id>/productos/", views.LoteProductoView.as_view(), name="lote_productos"),
+    path("lotes/<int:lote_id>/productos/<int:lote_producto_id>/", views.LoteProductoDetalleView.as_view(), name="lote_producto_detalle"),
 ]

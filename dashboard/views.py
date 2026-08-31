@@ -18,13 +18,13 @@ class GastosPorCategoriaView(APIView):
 class EvolucionMensualView(APIView):
     def get(self, request, negocio_id):
         query = """
-            SELECT EXTRACT(YEAR FROM fecha) as anio,
-                   EXTRACT(MONTH FROM fecha) as mes,
+            SELECT YEAR(fecha) as anio,
+                   MONTH(fecha) as mes,
                    SUM(monto) as total
               FROM gasto
              WHERE negocio_id = %s
-             GROUP BY EXTRACT(YEAR FROM fecha), EXTRACT(MONTH FROM fecha)
-             ORDER BY EXTRACT(YEAR FROM fecha), EXTRACT(MONTH FROM fecha)
+             GROUP BY YEAR(fecha), MONTH(fecha)
+             ORDER BY YEAR(fecha), MONTH(fecha)
         """
         parametros = [negocio_id]
         resultados = fetch_all(query, parametros)
@@ -50,16 +50,16 @@ class TotalesView(APIView):
 class MargenMensualView(APIView):
     def get(self, request, negocio_id):
         query = """
-            SELECT EXTRACT(YEAR FROM venta.fecha) as anio,
-                   EXTRACT(MONTH FROM venta.fecha) as mes,
+            SELECT YEAR(venta.fecha) as anio,
+                   MONTH(venta.fecha) as mes,
                    SUM(venta_detalle.subtotal) as ingreso,
-                   SUM(venta_detalle.cantidad * COALESCE(producto.costo, 0)) as costo
+                   SUM(venta_detalle.cantidad * COALESCE(lote_producto.costo, 0)) as costo
               FROM venta_detalle
               JOIN venta ON venta_detalle.venta_id = venta.id
-              JOIN producto ON venta_detalle.producto_id = producto.id
+              LEFT JOIN lote_producto ON venta_detalle.lote_producto_id = lote_producto.id
              WHERE venta.negocio_id = %s
-             GROUP BY EXTRACT(YEAR FROM venta.fecha), EXTRACT(MONTH FROM venta.fecha)
-             ORDER BY EXTRACT(YEAR FROM venta.fecha), EXTRACT(MONTH FROM venta.fecha)
+             GROUP BY YEAR(venta.fecha), MONTH(venta.fecha)
+             ORDER BY YEAR(venta.fecha), MONTH(venta.fecha)
         """
         parametros = [negocio_id]
         resultados = fetch_all(query, parametros)
@@ -90,21 +90,21 @@ class ProductosMasVendidosView(APIView):
 class ProyeccionVsRealidadView(APIView):
     def get(self, request, negocio_id):
         query_ventas = """
-            SELECT TO_CHAR(fecha, 'YYYY-MM') AS mes,
+            SELECT FORMAT(fecha, 'yyyy-MM') AS mes,
                    SUM(monto_total) AS venta_real
               FROM venta
              WHERE negocio_id = %s
-             GROUP BY TO_CHAR(fecha, 'YYYY-MM')
+             GROUP BY FORMAT(fecha, 'yyyy-MM')
         """
         parametros = [negocio_id]
         ventas_por_mes = fetch_all(query_ventas, parametros)
 
         query_inyecciones = """
-            SELECT TO_CHAR(fecha, 'YYYY-MM') as mes,
+            SELECT FORMAT(fecha, 'yyyy-MM') as mes,
                    SUM(monto) as inyeccion
               FROM inyeccion_capital
              WHERE negocio_id = %s
-             GROUP BY TO_CHAR(fecha, 'YYYY-MM')
+             GROUP BY FORMAT(fecha, 'yyyy-MM')
         """
         inyecciones_por_mes = fetch_all(query_inyecciones, parametros)
 

@@ -58,14 +58,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME'),
-        'HOST': os.environ.get('DB_HOST'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
-        'USER': os.environ.get('DB_USER'),
-        'PASSWORD': os.environ.get('DB_PASSWORD'),
+        'ENGINE': 'mssql',
+        'NAME': 'MARUE',
+        'HOST': 'localhost',
+        'PORT': '',
         'OPTIONS': {
-            'sslmode': 'require',
+            'driver': 'SQL Server',
+            'trusted_connection': 'yes',
+            'host_is_server': True,
         },
     }
 }

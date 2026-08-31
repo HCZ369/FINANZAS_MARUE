@@ -67,33 +67,44 @@ class ClienteDetalleView(APIView):
 
 class ProductosView(APIView):
     def get(self, request, negocio_id):
-        query = "SELECT id, negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada, imagen_url FROM producto WHERE negocio_id = %s"
+        query = """
+            SELECT p.id, p.negocio_id, p.nombre, p.precio, p.imagen_url, p.estado,
+                   COALESCE(compras.total, 0) AS cantidad_comprada,
+                   COALESCE(ventas_total.total, 0) AS cantidad_vendida,
+                   COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock
+              FROM producto p
+              LEFT JOIN (
+                  SELECT producto_id, SUM(cantidad_comprada) AS total
+                  FROM lote_producto
+                  GROUP BY producto_id
+              ) compras ON compras.producto_id = p.id
+              LEFT JOIN (
+                  SELECT producto_id, SUM(cantidad) AS total
+                  FROM venta_detalle
+                  GROUP BY producto_id
+              ) ventas_total ON ventas_total.producto_id = p.id
+             WHERE p.negocio_id = %s
+             ORDER BY p.nombre
+        """
         registros = fetch_all(query, [negocio_id])
         return Response(registros)
 
     def post(self, request, negocio_id):
         nombre = request.data.get("nombre")
         precio = request.data.get("precio")
-        costo = request.data.get("costo")
-        lote_id = request.data.get("lote_id")
-        costo_usd = request.data.get("costo_usd")
-        cantidad_comprada = request.data.get("cantidad_comprada")
         imagen_url = request.data.get("imagen_url")
+        categoria_id = request.data.get("categoria_id")
+        descripcion = request.data.get("descripcion")
 
-        if costo_usd is not None and lote_id is not None:
-            lote = fetch_one("SELECT tasa_cambio FROM lote WHERE id = %s AND negocio_id = %s", [lote_id, negocio_id])
-            if lote is not None:
-                costo = float(costo_usd) * float(lote["tasa_cambio"])
+        query = """
+            INSERT INTO producto (negocio_id, nombre, precio, imagen_url, categoria_id, descripcion)
+            OUTPUT INSERTED.id
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        parametros = [negocio_id, nombre, precio, imagen_url, categoria_id, descripcion]
+        producto_id = execute_insert(query, parametros)
 
-        query = "INSERT INTO producto (negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada, imagen_url) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-        parametros = [negocio_id, nombre, precio, costo, lote_id, costo_usd, cantidad_comprada, imagen_url]
-
-        filas_afectadas = execute_command(query, parametros)
-
-        if filas_afectadas == 0:
-            return Response({"error": "No se registro el producto"}, status=400)
-
-        return Response({"mensaje": "Producto creado"})
+        return Response({"mensaje": "Producto creado", "producto_id": producto_id})
 
 
 class ProductoDetalleView(APIView):
@@ -104,24 +115,29 @@ class ProductoDetalleView(APIView):
         if producto is None:
             return Response({"error": "Producto no encontrado"}, status=404)
 
+        query_lotes = """
+            SELECT lp.id AS lote_producto_id, lp.lote_id, lp.costo_usd, lp.costo,
+                   lp.cantidad_comprada, lp.precio_sugerido,
+                   l.fecha AS lote_fecha, l.tasa_cambio, l.descripcion AS lote_descripcion
+              FROM lote_producto lp
+              JOIN lote l ON lp.lote_id = l.id
+             WHERE lp.producto_id = %s
+             ORDER BY l.fecha DESC
+        """
+        lotes = fetch_all(query_lotes, [producto_id])
+        producto["lotes"] = lotes
+
         return Response(producto)
 
     def put(self, request, negocio_id, producto_id):
         nombre = request.data.get("nombre")
         precio = request.data.get("precio")
-        costo = request.data.get("costo")
-        lote_id = request.data.get("lote_id")
-        costo_usd = request.data.get("costo_usd")
-        cantidad_comprada = request.data.get("cantidad_comprada")
         imagen_url = request.data.get("imagen_url")
+        categoria_id = request.data.get("categoria_id")
+        descripcion = request.data.get("descripcion")
 
-        if costo_usd is not None and lote_id is not None:
-            lote = fetch_one("SELECT tasa_cambio FROM lote WHERE id = %s AND negocio_id = %s", [lote_id, negocio_id])
-            if lote is not None:
-                costo = float(costo_usd) * float(lote["tasa_cambio"])
-
-        query = "UPDATE producto SET nombre = %s, precio = %s, costo = %s, lote_id = %s, costo_usd = %s, cantidad_comprada = %s, imagen_url = %s WHERE id = %s AND negocio_id = %s"
-        parametros = [nombre, precio, costo, lote_id, costo_usd, cantidad_comprada, imagen_url, producto_id, negocio_id]
+        query = "UPDATE producto SET nombre = %s, precio = %s, imagen_url = %s, categoria_id = %s, descripcion = %s WHERE id = %s AND negocio_id = %s"
+        parametros = [nombre, precio, imagen_url, categoria_id, descripcion, producto_id, negocio_id]
 
         filas_afectadas = execute_command(query, parametros)
 
@@ -170,7 +186,11 @@ class VentasView(APIView):
         })
 
     def crear_venta(self, negocio_id, cliente_id, fecha, metodo_pago, notas, productos):
-        query = "INSERT INTO venta (negocio_id, cliente_id, fecha, monto_total, metodo_pago, notas) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id"
+        query = """
+            INSERT INTO venta (negocio_id, cliente_id, fecha, monto_total, metodo_pago, notas)
+            OUTPUT INSERTED.id
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
         venta_id = execute_insert(query, [negocio_id, cliente_id, fecha, 0, metodo_pago, notas])
 
         monto_acumulado = 0
@@ -178,6 +198,7 @@ class VentasView(APIView):
             producto_id = producto_item.get("producto_id")
             cantidad = producto_item.get("cantidad")
             precio_vendido = producto_item.get("precio_vendido")
+            lote_producto_id = producto_item.get("lote_producto_id")
 
             if precio_vendido is not None:
                 precio = float(precio_vendido)
@@ -188,8 +209,8 @@ class VentasView(APIView):
 
             subtotal = precio * cantidad
 
-            query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s)"
-            execute_command(query_detalle, [venta_id, producto_id, cantidad, precio, subtotal])
+            query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, lote_producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s, %s)"
+            execute_command(query_detalle, [venta_id, producto_id, lote_producto_id, cantidad, precio, subtotal])
 
             monto_acumulado = monto_acumulado + subtotal
 
@@ -209,14 +230,24 @@ class VentasView(APIView):
             producto_id = producto_item.get("producto_id")
 
             query_stock = """
-                SELECT producto.nombre AS nombre,
-                       COALESCE(producto.cantidad_comprada, 0) - COALESCE(SUM(venta_detalle.cantidad), 0) AS stock
-                  FROM producto
-                  LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
-                 WHERE producto.id = %s
-                 GROUP BY producto.nombre, producto.cantidad_comprada
+                SELECT p.nombre,
+                       COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock
+                  FROM producto p
+                  LEFT JOIN (
+                      SELECT producto_id, SUM(cantidad_comprada) AS total
+                      FROM lote_producto
+                      WHERE producto_id = %s
+                      GROUP BY producto_id
+                  ) compras ON compras.producto_id = p.id
+                  LEFT JOIN (
+                      SELECT producto_id, SUM(cantidad) AS total
+                      FROM venta_detalle
+                      WHERE producto_id = %s
+                      GROUP BY producto_id
+                  ) ventas_total ON ventas_total.producto_id = p.id
+                 WHERE p.id = %s
             """
-            resultado = fetch_one(query_stock, [producto_id])
+            resultado = fetch_one(query_stock, [producto_id, producto_id, producto_id])
             if resultado is not None and resultado["stock"] < 0:
                 aviso = {"producto": resultado["nombre"], "stock": resultado["stock"]}
                 avisos.append(aviso)
@@ -272,6 +303,7 @@ class VentaDetalleView(APIView):
             producto_id = producto_item.get("producto_id")
             cantidad = producto_item.get("cantidad")
             precio_vendido = producto_item.get("precio_vendido")
+            lote_producto_id = producto_item.get("lote_producto_id")
 
             if precio_vendido is not None:
                 precio = float(precio_vendido)
@@ -282,8 +314,8 @@ class VentaDetalleView(APIView):
 
             subtotal = precio * cantidad
 
-            query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s)"
-            execute_command(query_detalle, [venta_id, producto_id, cantidad, precio, subtotal])
+            query_detalle = "INSERT INTO venta_detalle (venta_id, producto_id, lote_producto_id, cantidad, precio_unitario, subtotal) VALUES (%s, %s, %s, %s, %s, %s)"
+            execute_command(query_detalle, [venta_id, producto_id, lote_producto_id, cantidad, precio, subtotal])
 
             monto_acumulado = monto_acumulado + subtotal
 
@@ -301,14 +333,24 @@ class VentaDetalleView(APIView):
             producto_id = producto_item.get("producto_id")
 
             query_stock = """
-                SELECT producto.nombre AS nombre,
-                       COALESCE(producto.cantidad_comprada, 0) - COALESCE(SUM(venta_detalle.cantidad), 0) AS stock
-                  FROM producto
-                  LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
-                 WHERE producto.id = %s
-                 GROUP BY producto.nombre, producto.cantidad_comprada
+                SELECT p.nombre,
+                       COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock
+                  FROM producto p
+                  LEFT JOIN (
+                      SELECT producto_id, SUM(cantidad_comprada) AS total
+                      FROM lote_producto
+                      WHERE producto_id = %s
+                      GROUP BY producto_id
+                  ) compras ON compras.producto_id = p.id
+                  LEFT JOIN (
+                      SELECT producto_id, SUM(cantidad) AS total
+                      FROM venta_detalle
+                      WHERE producto_id = %s
+                      GROUP BY producto_id
+                  ) ventas_total ON ventas_total.producto_id = p.id
+                 WHERE p.id = %s
             """
-            resultado = fetch_one(query_stock, [producto_id])
+            resultado = fetch_one(query_stock, [producto_id, producto_id, producto_id])
             if resultado is not None and resultado["stock"] < 0:
                 aviso = {"producto": resultado["nombre"], "stock": resultado["stock"]}
                 avisos.append(aviso)
@@ -336,7 +378,7 @@ class VentasPorClienteView(APIView):
 
 class LotesView(APIView):
     def get(self, request, negocio_id):
-        query = "SELECT id, negocio_id, fecha, tasa_cambio, descripcion FROM lote WHERE negocio_id = %s ORDER BY fecha DESC"
+        query = "SELECT id, negocio_id, fecha, tasa_cambio, descripcion, plataforma, estado FROM lote WHERE negocio_id = %s ORDER BY fecha DESC"
         resultados = fetch_all(query, [negocio_id])
         return Response(resultados)
 
@@ -344,26 +386,49 @@ class LotesView(APIView):
         fecha = request.data.get("fecha")
         tasa_cambio = request.data.get("tasa_cambio")
         descripcion = request.data.get("descripcion")
+        plataforma = request.data.get("plataforma")
 
-        query = "INSERT INTO lote (negocio_id, fecha, tasa_cambio, descripcion) VALUES (%s, %s, %s, %s)"
-        parametros = [negocio_id, fecha, tasa_cambio, descripcion]
+        query = """
+            INSERT INTO lote (negocio_id, fecha, tasa_cambio, descripcion, plataforma)
+            OUTPUT INSERTED.id
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        parametros = [negocio_id, fecha, tasa_cambio, descripcion, plataforma]
+        lote_id = execute_insert(query, parametros)
 
-        filas_afectadas = execute_command(query, parametros)
-
-        if filas_afectadas == 0:
-            return Response({"error": "No se registro el lote"}, status=400)
-
-        return Response({"mensaje": "Lote creado"})
+        return Response({"mensaje": "Lote creado", "lote_id": lote_id})
 
 
 class LoteDetalleView(APIView):
+    def get(self, request, negocio_id, lote_id):
+        query = "SELECT * FROM lote WHERE id = %s AND negocio_id = %s"
+        lote = fetch_one(query, [lote_id, negocio_id])
+
+        if lote is None:
+            return Response({"error": "Lote no encontrado"}, status=404)
+
+        query_productos = """
+            SELECT lp.id AS lote_producto_id, lp.producto_id, lp.costo_usd, lp.costo,
+                   lp.cantidad_comprada, lp.precio_sugerido,
+                   p.nombre AS producto_nombre
+              FROM lote_producto lp
+              JOIN producto p ON lp.producto_id = p.id
+             WHERE lp.lote_id = %s
+             ORDER BY p.nombre
+        """
+        productos = fetch_all(query_productos, [lote_id])
+        lote["productos"] = productos
+
+        return Response(lote)
+
     def put(self, request, negocio_id, lote_id):
         fecha = request.data.get("fecha")
         tasa_cambio = request.data.get("tasa_cambio")
         descripcion = request.data.get("descripcion")
+        plataforma = request.data.get("plataforma")
 
-        query = "UPDATE lote SET fecha = %s, tasa_cambio = %s, descripcion = %s WHERE id = %s AND negocio_id = %s"
-        parametros = [fecha, tasa_cambio, descripcion, lote_id, negocio_id]
+        query = "UPDATE lote SET fecha = %s, tasa_cambio = %s, descripcion = %s, plataforma = %s WHERE id = %s AND negocio_id = %s"
+        parametros = [fecha, tasa_cambio, descripcion, plataforma, lote_id, negocio_id]
 
         filas_afectadas = execute_command(query, parametros)
 
@@ -380,6 +445,66 @@ class LoteDetalleView(APIView):
             return Response({"error": "Lote no encontrado"}, status=404)
 
         return Response({"mensaje": "Lote eliminado"})
+
+
+class LoteProductoView(APIView):
+    def post(self, request, negocio_id, lote_id):
+        producto_id = request.data.get("producto_id")
+        costo_usd = request.data.get("costo_usd")
+        cantidad_comprada = request.data.get("cantidad_comprada")
+        precio_sugerido = request.data.get("precio_sugerido")
+
+        lote = fetch_one("SELECT tasa_cambio FROM lote WHERE id = %s AND negocio_id = %s", [lote_id, negocio_id])
+        if lote is None:
+            return Response({"error": "Lote no encontrado"}, status=404)
+
+        costo = None
+        if costo_usd is not None:
+            costo = float(costo_usd) * float(lote["tasa_cambio"])
+
+        query = """
+            INSERT INTO lote_producto (lote_id, producto_id, costo_usd, costo, cantidad_comprada, precio_sugerido)
+            OUTPUT INSERTED.id
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        parametros = [lote_id, producto_id, costo_usd, costo, cantidad_comprada, precio_sugerido]
+        lote_producto_id = execute_insert(query, parametros)
+
+        return Response({"mensaje": "Producto agregado al lote", "lote_producto_id": lote_producto_id})
+
+
+class LoteProductoDetalleView(APIView):
+    def put(self, request, negocio_id, lote_id, lote_producto_id):
+        costo_usd = request.data.get("costo_usd")
+        cantidad_comprada = request.data.get("cantidad_comprada")
+        precio_sugerido = request.data.get("precio_sugerido")
+
+        lote = fetch_one("SELECT tasa_cambio FROM lote WHERE id = %s AND negocio_id = %s", [lote_id, negocio_id])
+        if lote is None:
+            return Response({"error": "Lote no encontrado"}, status=404)
+
+        costo = None
+        if costo_usd is not None:
+            costo = float(costo_usd) * float(lote["tasa_cambio"])
+
+        query = "UPDATE lote_producto SET costo_usd = %s, costo = %s, cantidad_comprada = %s, precio_sugerido = %s WHERE id = %s AND lote_id = %s"
+        parametros = [costo_usd, costo, cantidad_comprada, precio_sugerido, lote_producto_id, lote_id]
+
+        filas_afectadas = execute_command(query, parametros)
+
+        if filas_afectadas == 0:
+            return Response({"error": "Producto del lote no actualizado"}, status=404)
+
+        return Response({"mensaje": "Producto del lote actualizado"})
+
+    def delete(self, request, negocio_id, lote_id, lote_producto_id):
+        query = "DELETE FROM lote_producto WHERE id = %s AND lote_id = %s"
+        filas_afectadas = execute_command(query, [lote_producto_id, lote_id])
+
+        if filas_afectadas == 0:
+            return Response({"error": "Producto del lote no encontrado"}, status=404)
+
+        return Response({"mensaje": "Producto del lote eliminado"})
 
 
 class SugerenciaPrecioView(APIView):
@@ -425,16 +550,24 @@ class SugerenciaPrecioView(APIView):
 class StockView(APIView):
     def get(self, request, negocio_id):
         query = """
-                SELECT producto.id AS producto_id,
-                       producto.nombre AS producto_nombre,
-                       COALESCE(producto.cantidad_comprada, 0) AS comprado,
-                       COALESCE(SUM(venta_detalle.cantidad), 0) AS vendido,
-                       COALESCE(producto.cantidad_comprada, 0) - COALESCE(SUM(venta_detalle.cantidad), 0) AS stock
-                  FROM producto
-                  LEFT JOIN venta_detalle ON venta_detalle.producto_id = producto.id
-                 WHERE producto.negocio_id = %s
-                 GROUP BY producto.id, producto.nombre, producto.cantidad_comprada
-                 ORDER BY producto.nombre
-                """
+            SELECT p.id AS producto_id,
+                   p.nombre AS producto_nombre,
+                   COALESCE(compras.total, 0) AS comprado,
+                   COALESCE(ventas_total.total, 0) AS vendido,
+                   COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock
+              FROM producto p
+              LEFT JOIN (
+                  SELECT producto_id, SUM(cantidad_comprada) AS total
+                  FROM lote_producto
+                  GROUP BY producto_id
+              ) compras ON compras.producto_id = p.id
+              LEFT JOIN (
+                  SELECT producto_id, SUM(cantidad) AS total
+                  FROM venta_detalle
+                  GROUP BY producto_id
+              ) ventas_total ON ventas_total.producto_id = p.id
+             WHERE p.negocio_id = %s
+             ORDER BY p.nombre
+        """
         resultados = fetch_all(query, [negocio_id])
         return Response(resultados)
