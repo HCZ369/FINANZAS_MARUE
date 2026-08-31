@@ -1,4 +1,4 @@
-const API_BASE = "https://finanzas-marue-api.onrender.com/api"
+export const API_BASE = "https://golf-jar-les-judicial.trycloudflare.com/api"
 
 async function manejarRespuesta(respuesta) {
   if (!respuesta.ok) {
