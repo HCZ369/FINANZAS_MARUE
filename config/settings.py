@@ -12,8 +12,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", 'localhost,127.0.0.1').split(",")
-
+ALLOWED_HOSTS = ['*']
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
@@ -36,7 +35,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'config.urls'
 
@@ -63,7 +62,7 @@ DATABASES = {
         'HOST': 'localhost',
         'PORT': '',
         'OPTIONS': {
-            'driver': 'SQL Server',
+            'driver': 'ODBC Driver 17 for SQL Server',
             'trusted_connection': 'yes',
             'host_is_server': True,
         },
