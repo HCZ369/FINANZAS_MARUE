@@ -1,4 +1,4 @@
-export const API_BASE = "https://durable-sheep-ton-geological.trycloudflare.com/api"
+export const API_BASE = "https://cornflake-exorcist-facsimile.ngrok-free.dev/api"
 
 async function manejarRespuesta(respuesta) {
   if (!respuesta.ok) {
