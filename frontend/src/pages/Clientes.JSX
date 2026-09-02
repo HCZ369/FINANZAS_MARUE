@@ -6,6 +6,7 @@ import {
   useState,
 } from "react"
 
+
 import {
   apiDelete,
   apiGet,
@@ -188,7 +189,7 @@ function Clientes({ negocioId }) {
 
       mostrarMensaje(
         error?.message ||
-          "No se pudo cargar el historial del cliente.",
+        "No se pudo cargar el historial del cliente.",
         "error"
       )
     } finally {
@@ -251,19 +252,19 @@ function Clientes({ negocioId }) {
 
       const resultado = editandoId
         ? await apiPut(
-            `/negocios/${negocioId}/clientes/${editandoId}/`,
-            datos
-          )
+          `/negocios/${negocioId}/clientes/${editandoId}/`,
+          datos
+        )
         : await apiPost(
-            `/negocios/${negocioId}/clientes/`,
-            datos
-          )
+          `/negocios/${negocioId}/clientes/`,
+          datos
+        )
 
       mostrarMensaje(
         resultado?.mensaje ||
-          (editandoId
-            ? "Cliente actualizado correctamente."
-            : "Cliente creado correctamente.")
+        (editandoId
+          ? "Cliente actualizado correctamente."
+          : "Cliente creado correctamente.")
       )
 
       limpiarFormulario()
