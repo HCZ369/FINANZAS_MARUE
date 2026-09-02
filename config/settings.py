@@ -36,6 +36,11 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "content-type",
+    "ngrok-skip-browser-warning",
+]
 
 ROOT_URLCONF = 'config.urls'
 

@@ -16,15 +16,20 @@ async function manejarRespuesta(respuesta) {
   return await respuesta.json()
 }
 
+const headers = {
+  "Content-Type": "application/json",
+  "ngrok-skip-browser-warning": "true",
+}
+
 export async function apiGet(ruta) {
-  const respuesta = await fetch(`${API_BASE}${ruta}`)
+  const respuesta = await fetch(`${API_BASE}${ruta}`, { headers })
   return await manejarRespuesta(respuesta)
 }
 
 export async function apiPost(ruta, datos) {
   const respuesta = await fetch(`${API_BASE}${ruta}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(datos),
   })
   return await manejarRespuesta(respuesta)
@@ -33,13 +38,16 @@ export async function apiPost(ruta, datos) {
 export async function apiPut(ruta, datos) {
   const respuesta = await fetch(`${API_BASE}${ruta}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(datos),
   })
   return await manejarRespuesta(respuesta)
 }
 
 export async function apiDelete(ruta) {
-  const respuesta = await fetch(`${API_BASE}${ruta}`, { method: "DELETE" })
+  const respuesta = await fetch(`${API_BASE}${ruta}`, {
+    method: "DELETE",
+    headers,
+  })
   return await manejarRespuesta(respuesta)
 }
