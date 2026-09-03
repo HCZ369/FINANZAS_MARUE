@@ -104,8 +104,24 @@ class ProductosView(APIView):
         parametros = [negocio_id, nombre, precio, imagen_url, categoria_id, descripcion]
         producto_id = execute_insert(query, parametros)
 
-        return Response({"mensaje": "Producto creado", "producto_id": producto_id})
+        lote_id = request.data.get("lote_id")
+        costo_usd = request.data.get("costo_usd")
+        cantidad_comprada = request.data.get("cantidad_comprada")
 
+        if lote_id and cantidad_comprada:
+            lote = fetch_one("SELECT tasa_cambio FROM lote WHERE id = %s AND negocio_id = %s", [lote_id, negocio_id])
+            costo = None
+            precio_sugerido = None
+            if lote and costo_usd:
+                costo = float(costo_usd) * float(lote["tasa_cambio"])
+
+            query_lp = """
+                INSERT INTO lote_producto (lote_id, producto_id, costo_usd, costo, cantidad_comprada, precio_sugerido)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            execute_command(query_lp, [lote_id, producto_id, costo_usd, costo, cantidad_comprada, precio_sugerido])
+
+        return Response({"mensaje": "Producto creado", "producto_id": producto_id})
 
 class ProductoDetalleView(APIView):
     def get(self, request, negocio_id, producto_id):

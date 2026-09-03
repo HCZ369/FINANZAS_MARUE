@@ -44,10 +44,12 @@ const ORDENES = {
 const FORMULARIO_INICIAL = {
   nombre: "",
   precio: "",
+  imagenUrl: "",
+  categoriaId: "",
+  descripcion: "",
   loteId: "",
   costoUsd: "",
   cantidadComprada: "",
-  imagenUrl: "",
 }
 
 function Catalogo({ negocioId }) {
@@ -56,7 +58,7 @@ function Catalogo({ negocioId }) {
 
   const [productos, setProductos] = useState([])
   const [stock, setStock] = useState([])
-  const [lotes, setLotes] = useState([])
+  const [categorias, setCategorias] = useState([])
 
   const [busqueda, setBusqueda] = useState("")
   const [filtroStock, setFiltroStock] = useState(FILTROS_STOCK.TODOS)
@@ -101,14 +103,16 @@ function Catalogo({ negocioId }) {
     try {
       setCargando(true)
 
-      const [productosData, stockData, lotesData] = await Promise.all([
+      const [productosData, stockData, categoriasData, lotesData] = await Promise.all([
         apiGet(`/negocios/${negocioId}/productos/`),
         apiGet(`/negocios/${negocioId}/stock/`),
+        apiGet(`/negocios/${negocioId}/categorias/`),
         apiGet(`/negocios/${negocioId}/lotes/`),
       ])
 
       setProductos(Array.isArray(productosData) ? productosData : [])
       setStock(Array.isArray(stockData) ? stockData : [])
+      setCategorias(Array.isArray(categoriasData) ? categoriasData : [])
       setLotes(Array.isArray(lotesData) ? lotesData : [])
     } catch (error) {
       mostrarMensaje(error?.message || "No se pudo cargar el catálogo.", "error")
@@ -389,23 +393,15 @@ function Catalogo({ negocioId }) {
       return
     }
 
-    const datos = {
+      const datos = {
       nombre: formulario.nombre.trim(),
       precio: convertirNumero(formulario.precio),
-      costo:
-        sugerencia?.costo_unitario != null
-          ? convertirNumero(sugerencia.costo_unitario)
-          : null,
-      lote_id: formulario.loteId ? Number(formulario.loteId) : null,
-      costo_usd:
-        formulario.costoUsd !== ""
-          ? convertirNumero(formulario.costoUsd)
-          : null,
-      cantidad_comprada:
-        formulario.cantidadComprada !== ""
-          ? convertirNumero(formulario.cantidadComprada)
-          : null,
       imagen_url: formulario.imagenUrl.trim() || null,
+      categoria_id: formulario.categoriaId ? Number(formulario.categoriaId) : null,
+      descripcion: formulario.descripcion.trim() || null,
+      lote_id: formulario.loteId ? Number(formulario.loteId) : null,
+      costo_usd: formulario.costoUsd !== "" ? convertirNumero(formulario.costoUsd) : null,
+      cantidad_comprada: formulario.cantidadComprada !== "" ? convertirNumero(formulario.cantidadComprada) : null,
     }
 
     try {
@@ -760,6 +756,7 @@ function Catalogo({ negocioId }) {
         <ModalFormularioProducto
           modo={modalFormulario}
           formulario={formulario}
+          categorias={categorias}
           lotes={lotes}
           sugerencia={sugerencia}
           guardando={guardando}
@@ -966,8 +963,8 @@ function ModalProducto({
 function ModalFormularioProducto({
   modo,
   formulario,
+  categorias,
   lotes,
-  sugerencia,
   guardando,
   calculandoSugerencia,
   formularioValido,
@@ -975,6 +972,7 @@ function ModalFormularioProducto({
   onSugerencia,
   onGuardar,
   onCerrar,
+  sugerencia,
 }) {
   const esCreacion = modo === "crear"
 
@@ -987,7 +985,6 @@ function ModalFormularioProducto({
       <form className="cat-form-edicion" onSubmit={onGuardar}>
         <div className="campo">
           <label htmlFor="producto-nombre">Nombre</label>
-
           <input
             id="producto-nombre"
             type="text"
@@ -1002,7 +999,6 @@ function ModalFormularioProducto({
 
         <div className="campo">
           <label htmlFor="producto-imagen">URL de imagen</label>
-
           <input
             id="producto-imagen"
             type="url"
@@ -1010,13 +1006,9 @@ function ModalFormularioProducto({
             onChange={(evento) => onCambiar("imagenUrl", evento.target.value)}
             placeholder="https://ejemplo.com/producto.jpg"
           />
-
           {formulario.imagenUrl.trim() && (
             <div className="cat-preview-img">
-              <ImagenProducto
-                src={formulario.imagenUrl}
-                alt="Vista previa"
-              />
+              <ImagenProducto src={formulario.imagenUrl} alt="Vista previa" />
             </div>
           )}
         </div>
@@ -1024,28 +1016,24 @@ function ModalFormularioProducto({
         <div className="grid-form-config">
           <div className="campo">
             <label htmlFor="producto-lote">Lote</label>
-
             <select
               id="producto-lote"
               value={formulario.loteId}
               onChange={(evento) => onCambiar("loteId", evento.target.value)}
             >
               <option value="">Sin lote</option>
-
               {lotes.map((lote) => (
                 <option key={lote.id} value={lote.id}>
-                  {formatearFecha(lote.fecha)} ·{" "}
-                  {lote.descripcion || `Lote ${lote.id}`}
+                  {lote.descripcion || "Lote " + lote.id} — {lote.fecha}
                 </option>
               ))}
             </select>
           </div>
 
           <div className="campo">
-            <label htmlFor="producto-costo">Costo en USD</label>
-
+            <label htmlFor="producto-costo-usd">Costo USD</label>
             <input
-              id="producto-costo"
+              id="producto-costo-usd"
               type="number"
               min="0"
               step="any"
@@ -1059,23 +1047,19 @@ function ModalFormularioProducto({
         <div className="grid-form-config">
           <div className="campo">
             <label htmlFor="producto-cantidad">Cantidad comprada</label>
-
             <input
               id="producto-cantidad"
               type="number"
               min="0"
               step="1"
               value={formulario.cantidadComprada}
-              onChange={(evento) =>
-                onCambiar("cantidadComprada", evento.target.value)
-              }
+              onChange={(evento) => onCambiar("cantidadComprada", evento.target.value)}
               placeholder="0"
             />
           </div>
 
           <div className="campo campo-accion">
             <span className="label-control">Sugerencia de precio</span>
-
             <button
               type="button"
               className="btn-secundario btn-ancho-completo"
@@ -1097,12 +1081,10 @@ function ModalFormularioProducto({
               <span>Costo unitario</span>
               <strong>{formatearMonto(sugerencia.costo_unitario)}</strong>
             </div>
-
             <div>
               <span>Multiplicador</span>
               <strong>{sugerencia.multiplicador}</strong>
             </div>
-
             <div>
               <span>Precio sugerido</span>
               <strong>{formatearMonto(sugerencia.precio_sugerido)}</strong>
@@ -1112,7 +1094,6 @@ function ModalFormularioProducto({
 
         <div className="campo cat-campo-precio">
           <label htmlFor="producto-precio">Precio final</label>
-
           <input
             id="producto-precio"
             type="number"
@@ -1134,7 +1115,6 @@ function ModalFormularioProducto({
           >
             Cancelar
           </button>
-
           <button
             type="submit"
             className="btn-principal"
