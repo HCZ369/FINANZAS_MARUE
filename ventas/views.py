@@ -6,8 +6,8 @@ from django.db import transaction
 
 class ClientesView(APIView):
     def get(self, request, negocio_id):
-        query = "SELECT * FROM cliente WHERE negocio_id = %s"
-        registros = fetch_all(query, [negocio_id])
+        query = "SELECT * FROM cliente ORDER BY nombre"
+        registros = fetch_all(query)
         return Response(registros)
 
     def post(self, request, negocio_id):
