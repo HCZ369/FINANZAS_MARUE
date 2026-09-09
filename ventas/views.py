@@ -571,7 +571,7 @@ class SugerenciaPrecioView(APIView):
             multiplicador = 2.2
 
         packaging = 5000
-        precio_sugerido = (round(costo_unitario) * multiplicador) + packaging 
+        precio_sugerido = (round(costo_unitario) * multiplicador) + packaging
 
         respuesta = {
             "costo_unitario": costo_unitario,
@@ -606,15 +606,8 @@ class StockView(APIView):
         resultados = fetch_all(query, [negocio_id])
         return Response(resultados)
 
+
 NUMERO_WHATSAPP = "595992188322"
-
-NETLIFY_TOKEN = "nfp_EygoDUYeR1XzJz21UfDuk2UZUoD662WU9bb1"
-
-NETLIFY_SITE_IDS = {
-    1: os.environ.get("NETLIFY_SITE_ID_1", ""),
-    2: os.environ.get("NETLIFY_SITE_ID_2", ""),
-    3: os.environ.get("NETLIFY_SITE_ID_3", ""),
-}
 
 TEXTOS_NEGOCIO = {
     1: {"titulo": "Marué Dark", "subtitulo": "Joyería oscura y artículos de cuero hechos a mano"},
@@ -661,6 +654,13 @@ class InversionPorLoteView(APIView):
 
 class GenerarCatalogoView(APIView):
     def post(self, request, negocio_id):
+        return self._generar(negocio_id)
+
+    def get(self, request, negocio_id):
+        # También por GET, así podés abrirlo directo desde el navegador si querés
+        return self._generar(negocio_id)
+
+    def _generar(self, negocio_id):
         negocio = fetch_one("SELECT id, nombre FROM negocio WHERE id = %s", [negocio_id])
         if negocio is None:
             return Response({"error": "Negocio no encontrado"}, status=404)
@@ -668,41 +668,17 @@ class GenerarCatalogoView(APIView):
         productos = self.obtener_productos_con_stock(negocio_id)
         if len(productos) == 0:
             return Response(
-                {"error": "No hay productos con stock disponible para publicar."},
+                {"error": "No hay productos con stock disponible."},
                 status=400,
             )
 
         html_catalogo = self.construir_html(negocio_id, negocio["nombre"], productos)
 
-        if not NETLIFY_TOKEN:
-            return Response(
-                {"error": "Falta configurar NETLIFY_TOKEN en el servidor."},
-                status=500,
-            )
-
-        try:
-            url_publica, site_id_usado, site_creado = self.publicar_en_netlify(
-                negocio_id, html_catalogo
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"No se pudo publicar en Netlify: {str(e)}"},
-                status=502,
-            )
-
-        respuesta = {
-            "mensaje": "Catálogo publicado",
-            "url": url_publica,
-            "cantidad_productos": len(productos),
-        }
-        if site_creado:
-            respuesta["site_id_nuevo"] = site_id_usado
-            respuesta["aviso"] = (
-                f"Se creó un site nuevo. Guardá este SITE ID en "
-                f"NETLIFY_SITE_ID_{negocio_id}: {site_id_usado}"
-            )
-
-        return Response(respuesta)
+        # Devolvemos el HTML como archivo descargable (index.html).
+        from django.http import HttpResponse
+        respuesta = HttpResponse(html_catalogo, content_type="text/html; charset=utf-8")
+        respuesta["Content-Disposition"] = 'attachment; filename="index.html"'
+        return respuesta
 
     
 
@@ -778,51 +754,6 @@ class GenerarCatalogoView(APIView):
         if "f_auto" in url:
             return url
         return url.replace("/upload/", "/upload/f_auto,q_auto/")
-
-    def publicar_en_netlify(self, negocio_id, html_catalogo):
-        site_id = NETLIFY_SITE_IDS.get(negocio_id, "")
-        site_creado = False
-
-        if not site_id:
-            site_id = self.crear_site_netlify(negocio_id)
-            site_creado = True
-
-        buffer_zip = io.BytesIO()
-        with zipfile.ZipFile(buffer_zip, "w", zipfile.ZIP_DEFLATED) as z:
-            z.writestr("index.html", html_catalogo)
-        buffer_zip.seek(0)
-
-        respuesta = requests.post(
-            f"https://api.netlify.com/api/v1/sites/{site_id}/deploys",
-            headers={
-                "Authorization": f"Bearer {NETLIFY_TOKEN}",
-                "Content-Type": "application/zip",
-            },
-            data=buffer_zip.read(),
-            timeout=60,
-        )
-
-        if respuesta.status_code >= 300:
-            raise Exception(f"Netlify {respuesta.status_code}: {respuesta.text[:200]}")
-
-        datos = respuesta.json()
-        url_publica = datos.get("ssl_url") or datos.get("url") or ""
-        return url_publica, site_id, site_creado
-
-    def crear_site_netlify(self, negocio_id):
-        nombre_site = f"marue-negocio-{negocio_id}"
-        respuesta = requests.post(
-            "https://api.netlify.com/api/v1/sites",
-            headers={"Authorization": f"Bearer {NETLIFY_TOKEN}"},
-            json={"name": nombre_site},
-            timeout=30,
-        )
-        if respuesta.status_code >= 300:
-            raise Exception(
-                f"No se pudo crear el site ({respuesta.status_code}): "
-                f"{respuesta.text[:200]}. Quizá el nombre '{nombre_site}' ya existe."
-            )
-        return respuesta.json()["id"]
 
 
 PLANTILLA_HTML = r"""<!DOCTYPE html>
