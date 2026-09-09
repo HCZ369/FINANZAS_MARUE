@@ -23,9 +23,13 @@ import {
   obtenerIniciales,
 } from "../utils"
 
-
-const CLOUDINARY_CLOUD_NAME = "zolcnxzz"
+/* ============================================================
+   CONFIGURACIÓN — editá SOLO estos dos valores una vez.
+   Los sacás del panel de Cloudinary (ver instrucciones aparte).
+   ============================================================ */
+const CLOUDINARY_CLOUD_NAME = "TU_CLOUD_NAME"
 const CLOUDINARY_UPLOAD_PRESET = "marue_productos"
+/* ============================================================ */
 
 const LIMITE_STOCK_BAJO = 10
 
@@ -1240,9 +1244,9 @@ function ModalFormularioProducto({
 function SubidorImagen({ imagenUrl, onSubida, onQuitar, mostrarMensaje }) {
   const inputRef = useRef(null)
   const [subiendo, setSubiendo] = useState(false)
+  const [arrastrando, setArrastrando] = useState(false)
 
-  async function manejarArchivo(evento) {
-    const archivo = evento.target.files?.[0]
+  async function subirArchivo(archivo) {
     if (!archivo) return
 
     if (!archivo.type.startsWith("image/")) {
@@ -1250,7 +1254,7 @@ function SubidorImagen({ imagenUrl, onSubida, onQuitar, mostrarMensaje }) {
       return
     }
 
-    // Límite de seguridad: 10 MB
+    // Límite de seguridad: 10 MB (tope del plan free de Cloudinary)
     if (archivo.size > 10 * 1024 * 1024) {
       mostrarMensaje?.("La imagen es muy grande (máximo 10 MB).", "error")
       return
@@ -1284,46 +1288,112 @@ function SubidorImagen({ imagenUrl, onSubida, onQuitar, mostrarMensaje }) {
     }
   }
 
+  function manejarInput(evento) {
+    const archivo = evento.target.files?.[0]
+    subirArchivo(archivo)
+  }
+
+  function manejarSoltar(evento) {
+    evento.preventDefault()
+    evento.stopPropagation()
+    setArrastrando(false)
+
+    if (subiendo) return
+
+    const archivo = evento.dataTransfer?.files?.[0]
+    subirArchivo(archivo)
+  }
+
+  function manejarArrastreEncima(evento) {
+    evento.preventDefault()
+    evento.stopPropagation()
+    if (!arrastrando) setArrastrando(true)
+  }
+
+  function manejarArrastreSale(evento) {
+    evento.preventDefault()
+    evento.stopPropagation()
+    setArrastrando(false)
+  }
+
+  const estiloZona = {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.4rem",
+    padding: "1.4rem 1rem",
+    border: `1px dashed ${arrastrando ? "var(--acento-hover)" : "var(--borde)"}`,
+    borderRadius: "var(--radio)",
+    background: arrastrando ? "var(--superficie-alta)" : "var(--superficie)",
+    color: "var(--texto-tenue)",
+    textAlign: "center",
+    cursor: subiendo ? "default" : "pointer",
+    transition: "border-color 130ms ease, background-color 130ms ease",
+  }
+
   return (
     <div className="campo">
       <label>Foto del producto</label>
 
       {imagenUrl && (
-        <div className="cat-preview-img" style={{ marginBottom: "0.5rem" }}>
+        <div className="cat-preview-img" style={{ marginBottom: "0.6rem" }}>
           <ImagenProducto src={imagenUrl} alt="Vista previa" />
         </div>
       )}
 
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <button
-          type="button"
-          className="btn-secundario"
-          onClick={() => inputRef.current?.click()}
-          disabled={subiendo}
-        >
-          {subiendo
-            ? "Subiendo..."
-            : imagenUrl
-              ? "Cambiar foto"
-              : "Subir foto"}
-        </button>
-
-        {imagenUrl && !subiendo && (
-          <button
-            type="button"
-            className="btn-borrar"
-            onClick={onQuitar}
-          >
-            Quitar foto
-          </button>
+      <div
+        style={estiloZona}
+        onClick={() => {
+          if (!subiendo) inputRef.current?.click()
+        }}
+        onDrop={manejarSoltar}
+        onDragOver={manejarArrastreEncima}
+        onDragEnter={manejarArrastreEncima}
+        onDragLeave={manejarArrastreSale}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && !subiendo) {
+            e.preventDefault()
+            inputRef.current?.click()
+          }
+        }}
+      >
+        {subiendo ? (
+          <span style={{ fontSize: "0.85rem" }}>Subiendo foto...</span>
+        ) : (
+          <>
+            <span style={{ fontSize: "0.85rem", color: "var(--texto)" }}>
+              {arrastrando
+                ? "Soltá la imagen acá"
+                : imagenUrl
+                  ? "Arrastrá otra imagen o hacé clic para cambiarla"
+                  : "Arrastrá una imagen acá o hacé clic para elegirla"}
+            </span>
+            <span style={{ fontSize: "0.72rem", color: "var(--texto-debil)" }}>
+              JPG o PNG · hasta 10 MB
+            </span>
+          </>
         )}
       </div>
+
+      {imagenUrl && !subiendo && (
+        <button
+          type="button"
+          className="btn-borrar"
+          style={{ marginTop: "0.5rem" }}
+          onClick={onQuitar}
+        >
+          Quitar foto
+        </button>
+      )}
 
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
-        onChange={manejarArchivo}
+        onChange={manejarInput}
         style={{ display: "none" }}
       />
     </div>
