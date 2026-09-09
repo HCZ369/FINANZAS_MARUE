@@ -228,198 +228,350 @@ class Command(BaseCommand):
 
 # PLANTILLA HTML  (dark goth, responsive, sin emojis)
 
+
 PLANTILLA_HTML = r"""<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{titulo}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after {{ box-sizing: border-box; }}
     * {{ margin: 0; padding: 0; }}
-
+ 
     :root {{
-      --fondo: #090909;
-      --fondo-profundo: #050505;
-      --superficie: #111011;
-      --superficie-alta: #171516;
-      --borde: #292427;
-      --texto: #ded9db;
-      --texto-fuerte: #f2eef0;
-      --texto-tenue: #999194;
-      --texto-debil: #686164;
-      --acento: #74394b;
-      --acento-hover: #8d465c;
-      --acento-claro: #c18496;
-      --radio: 3px;
+      --negro: #060506;
+      --negro-2: #0b090b;
+      --panel: #100d10;
+      --panel-2: #14101410;
+      --borde: #241d24;
+      --borde-luz: #3a2d38;
+      --hueso: #e7e0e4;
+      --hueso-tenue: #a99ea6;
+      --ceniza: #6f6570;
+      --vino: #7c3a4e;
+      --vino-1: #8a3a50;
+      --vino-2: #b06074;
+      --oro-viejo: #b89b6a;
     }}
-
-    html {{ background: var(--fondo); scrollbar-color: #3a3236 var(--fondo-profundo); }}
-
+ 
+    html {{
+      background: var(--negro);
+      scrollbar-color: #2a2029 var(--negro);
+    }}
+ 
     body {{
-      font-family: "Geist", "Segoe UI", Arial, sans-serif;
-      font-size: 14px; letter-spacing: -0.015em;
-      background: var(--fondo); color: var(--texto);
+      font-family: "Jost", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(ellipse at 50% -10%, #16101580 0%, transparent 60%),
+        var(--negro);
+      color: var(--hueso);
       -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
     }}
-
-    ::-webkit-scrollbar {{ width: 10px; }}
-    ::-webkit-scrollbar-track {{ background: var(--fondo-profundo); }}
-    ::-webkit-scrollbar-thumb {{ background: #332d30; border: 2px solid var(--fondo-profundo); }}
-
-    .contenedor {{ max-width: 1200px; margin: 0 auto; padding: 2.5rem 1rem 4rem; }}
-
-    .encabezado {{ text-align: center; margin-bottom: 2.5rem; }}
-    .encabezado h1 {{
-      color: var(--texto-fuerte); font-weight: 400;
-      font-size: clamp(1.6rem, 5vw, 2.4rem); letter-spacing: 0.06em;
+ 
+    ::-webkit-scrollbar {{ width: 9px; }}
+    ::-webkit-scrollbar-track {{ background: var(--negro); }}
+    ::-webkit-scrollbar-thumb {{ background: #2a2029; border: 2px solid var(--negro); }}
+ 
+    .wrap {{ max-width: 1100px; margin: 0 auto; padding: 2.5rem 1.1rem 4.5rem; }}
+ 
+    /* ---------- ENCABEZADO ---------- */
+    .head {{ text-align: center; margin-bottom: 2.75rem; position: relative; }}
+    .head::after {{
+      content: "";
+      display: block;
+      width: 54px; height: 1px;
+      margin: 1.15rem auto 0;
+      background: linear-gradient(90deg, transparent, var(--vino-2), transparent);
+    }}
+    .head h1 {{
+      font-family: "Cinzel", serif;
+      font-weight: 600;
+      font-size: clamp(1.7rem, 7vw, 2.9rem);
+      letter-spacing: 0.16em;
       text-transform: uppercase;
+      color: var(--hueso);
+      line-height: 1.1;
     }}
-    .encabezado p {{ color: var(--texto-tenue); margin-top: 0.6rem; font-size: 0.95rem; }}
-
-    .barra {{
-      display: flex; justify-content: center; margin-bottom: 2rem;
+    .head .sub {{
+      font-family: "Cormorant Garamond", serif;
+      font-style: italic;
+      font-size: clamp(0.95rem, 3.5vw, 1.15rem);
+      color: var(--hueso-tenue);
+      margin-top: 0.7rem;
+      letter-spacing: 0.02em;
     }}
-    .barra input {{
-      width: 100%; max-width: 420px; padding: 0.65rem 0.9rem;
-      background: var(--superficie); border: 1px solid var(--borde);
-      border-radius: var(--radio); color: var(--texto); font-size: 0.9rem;
-      outline: none; transition: border-color 130ms ease;
+ 
+    /* ---------- BUSCADOR ---------- */
+    .buscador {{ display: flex; justify-content: center; margin-bottom: 1.4rem; }}
+    .buscador input {{
+      width: 100%; max-width: 380px;
+      padding: 0.7rem 1rem;
+      background: var(--panel);
+      border: 1px solid var(--borde);
+      border-radius: 2px;
+      color: var(--hueso);
+      font-family: "Jost", sans-serif;
+      font-size: 0.9rem;
+      letter-spacing: 0.03em;
+      outline: none;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
     }}
-    .barra input:focus {{ border-color: var(--acento-hover); box-shadow: inset 2px 0 0 var(--acento-hover); }}
-    .barra input::placeholder {{ color: var(--texto-debil); }}
-
-    .contador {{ text-align: center; color: var(--texto-debil); font-size: 0.8rem; margin-bottom: 2rem; }}
-
+    .buscador input::placeholder {{ color: var(--ceniza); letter-spacing: 0.06em; }}
+    .buscador input:focus {{
+      border-color: var(--vino-1);
+      box-shadow: 0 0 0 1px var(--vino) inset;
+    }}
+ 
+    .contador {{
+      text-align: center;
+      color: var(--ceniza);
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-bottom: 2.2rem;
+    }}
+ 
+    /* ---------- GRILLA ---------- */
     .grilla {{
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 1.4rem;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.85rem;
     }}
-    @media (max-width: 640px) {{
-      .grilla {{ grid-template-columns: repeat(2, 1fr); gap: 0.9rem; }}
-      .contenedor {{ padding: 1.5rem 0.8rem 3rem; }}
+    @media (min-width: 620px) {{
+      .grilla {{ grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }}
     }}
-    @media (max-width: 380px) {{
-      .grilla {{ grid-template-columns: 1fr; }}
+    @media (min-width: 900px) {{
+      .grilla {{ grid-template-columns: repeat(4, 1fr); }}
     }}
-
+ 
+    /* ---------- TARJETA ---------- */
     .card {{
-      background: var(--superficie); border: 1px solid var(--borde);
-      border-radius: var(--radio); overflow: hidden; display: flex; flex-direction: column;
-      transition: border-color 130ms ease, transform 130ms ease;
+      position: relative;
+      display: flex; flex-direction: column;
+      background: linear-gradient(180deg, var(--panel) 0%, var(--negro-2) 100%);
+      border: 1px solid var(--borde);
+      border-radius: 2px;
+      overflow: hidden;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      font: inherit; color: inherit;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
     }}
-    .card:hover {{ border-color: var(--acento-hover); transform: translateY(-2px); }}
-
-    .card-img {{
-      width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
-      background: var(--superficie-alta); display: block;
+    .card::before {{
+      content: "";
+      position: absolute; inset: 0;
+      border: 1px solid transparent;
+      pointer-events: none;
+      transition: border-color 200ms ease;
+      z-index: 2;
     }}
-    .card-img-vacia {{
-      width: 100%; aspect-ratio: 1 / 1; background: var(--superficie-alta);
+    /* marco interior sutil al interactuar */
+    .card:hover, .card:active, .card:focus-visible {{
+      border-color: var(--borde-luz);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px -12px #000, 0 0 22px -14px var(--vino-2);
+      outline: none;
+    }}
+    .card:hover::before, .card:active::before, .card:focus-visible::before {{
+      border-color: #5a3f4d55;
+      inset: 5px;
+    }}
+ 
+    .foto {{
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: var(--negro-2);
+      overflow: hidden;
+    }}
+    .foto img {{
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: saturate(0.92) contrast(1.04);
+      transition: transform 450ms ease, filter 300ms ease;
+    }}
+    .card:hover .foto img, .card:active .foto img {{
+      transform: scale(1.05);
+      filter: saturate(1) contrast(1.06);
+    }}
+    .foto::after {{
+      content: "";
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 55%, #060506d9 100%);
+      pointer-events: none;
+    }}
+    .foto-vacia {{
+      width: 100%; aspect-ratio: 1 / 1;
+      background:
+        repeating-linear-gradient(45deg, #0d0a0d 0 10px, #0a080a 10px 20px);
       display: flex; align-items: center; justify-content: center;
-      color: var(--texto-debil); font-size: 0.75rem; text-align: center; padding: 1rem;
+      color: var(--ceniza);
+      font-family: "Cinzel", serif;
+      font-size: 1.6rem; letter-spacing: 0.1em;
     }}
-
-    .card-cuerpo {{ padding: 0.9rem; display: flex; flex-direction: column; gap: 0.55rem; flex-grow: 1; }}
-    .card-nombre {{ color: var(--texto-fuerte); font-weight: 500; line-height: 1.3; font-size: 0.95rem; }}
-    .card-meta {{ font-size: 0.75rem; color: var(--texto-tenue); line-height: 1.4; }}
-    .card-meta span {{ color: var(--texto-debil); }}
-    .card-desc {{ font-size: 0.78rem; color: var(--texto-tenue); line-height: 1.45; flex-grow: 1; }}
-
-    .card-pie {{
+ 
+    .cuerpo {{
+      display: flex; flex-direction: column;
+      gap: 0.4rem;
+      padding: 0.75rem 0.8rem 0.85rem;
+      flex-grow: 1;
+    }}
+    .nombre {{
+      font-family: "Cormorant Garamond", serif;
+      font-weight: 500;
+      font-size: 1.02rem;
+      line-height: 1.2;
+      color: var(--hueso);
+      letter-spacing: 0.01em;
+    }}
+    .meta {{
+      font-size: 0.68rem;
+      color: var(--hueso-tenue);
+      letter-spacing: 0.05em;
+      line-height: 1.5;
+    }}
+    .meta b {{ color: var(--ceniza); font-weight: 400; }}
+    .desc {{
+      font-size: 0.7rem;
+      color: var(--ceniza);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }}
+ 
+    .pie {{
       display: flex; align-items: center; justify-content: space-between;
-      gap: 0.5rem; padding-top: 0.6rem; border-top: 1px solid var(--borde); margin-top: auto;
+      gap: 0.4rem;
+      margin-top: auto;
+      padding-top: 0.6rem;
+      border-top: 1px solid var(--borde);
     }}
-    .card-precio {{ color: var(--acento-claro); font-weight: 600; font-size: 1rem; white-space: nowrap; }}
-
-    .btn-wa {{
-      border: 1px solid var(--acento); background: var(--acento); color: #f6eef1;
-      border-radius: var(--radio); padding: 0.45rem 0.7rem; font-size: 0.78rem;
-      font-weight: 600; cursor: pointer; transition: background 130ms ease; white-space: nowrap;
-      font-family: inherit;
+    .precio {{
+      font-family: "Cinzel", serif;
+      font-weight: 500;
+      font-size: 0.92rem;
+      color: var(--vino-2);
+      letter-spacing: 0.03em;
+      white-space: nowrap;
     }}
-    .btn-wa:hover {{ background: var(--acento-hover); }}
-
-    .vacio {{ text-align: center; color: var(--texto-tenue); padding: 3rem 1rem; }}
-
-    .pie {{ text-align: center; color: var(--texto-debil); font-size: 0.72rem; margin-top: 3rem; }}
+    .consultar {{
+      font-size: 0.62rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--hueso-tenue);
+      display: flex; align-items: center; gap: 0.3rem;
+      transition: color 200ms ease;
+    }}
+    .card:hover .consultar, .card:active .consultar {{ color: var(--vino-2); }}
+    .consultar svg {{ width: 12px; height: 12px; display: block; }}
+ 
+    /* ---------- ESTADOS / PIE ---------- */
+    .vacio {{
+      text-align: center;
+      color: var(--ceniza);
+      font-family: "Cormorant Garamond", serif;
+      font-style: italic;
+      font-size: 1.1rem;
+      padding: 3.5rem 1rem;
+    }}
+    .footer {{
+      text-align: center;
+      color: #4d454d;
+      font-size: 0.64rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-top: 3.5rem;
+    }}
   </style>
 </head>
 <body>
-  <div class="contenedor">
-    <div class="encabezado">
+  <div class="wrap">
+    <header class="head">
       <h1>{titulo}</h1>
-      <p>{subtitulo}</p>
+      <p class="sub">{subtitulo}</p>
+    </header>
+ 
+    <div class="buscador">
+      <input type="text" id="buscar" placeholder="Buscar pieza o material" autocomplete="off">
     </div>
-
-    <div class="barra">
-      <input type="text" id="buscar" placeholder="Buscar producto o material..." autocomplete="off">
-    </div>
-
+ 
     <div class="contador" id="contador"></div>
     <div class="grilla" id="grilla"></div>
-    <div class="vacio" id="vacio" style="display:none;">No se encontraron productos.</div>
-
-    <div class="pie">Actualizado recientemente · Precios en guaraníes</div>
+    <div class="vacio" id="vacio" style="display:none;">No se encontraron piezas.</div>
+ 
+    <footer class="footer">Precios en guaraníes &middot; Consultas por WhatsApp</footer>
   </div>
-
+ 
   <script>
     var PRODUCTOS = {productos_json};
     var WHATSAPP = "{numero_whatsapp}";
-
+ 
     var grilla = document.getElementById("grilla");
     var vacio = document.getElementById("vacio");
     var contador = document.getElementById("contador");
     var inputBuscar = document.getElementById("buscar");
-
+ 
     function escapar(t) {{
       var d = document.createElement("div");
       d.textContent = t == null ? "" : String(t);
       return d.innerHTML;
     }}
-
-    function abrirWhatsApp(nombre, precio) {{
-      var texto = "Hola! Me interesa este producto: " + nombre + " (" + precio + ")";
+ 
+    function consultar(p) {{
+      var texto = "Hola! Me interesa esta pieza: " + p.nombre + " (" + p.precio + ")";
       var url = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(texto);
       window.open(url, "_blank");
     }}
-
+ 
+    var ICONO_WA =
+      '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+      '<path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 20zm4.4-6c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.7.9-.3.2-.5.1a6.5 6.5 0 0 1-3.2-2.8c-.2-.4.2-.4.6-1.2.1-.2 0-.3 0-.4l-.7-1.7c-.2-.5-.4-.4-.5-.4h-.5a1 1 0 0 0-.7.3A2.9 2.9 0 0 0 6.4 10a5 5 0 0 0 1.1 2.7 11.5 11.5 0 0 0 4.4 3.9c2 .8 2 .6 2.4.5a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .1-1.2c-.1-.1-.2-.2-.4-.3z"/>' +
+      '</svg>';
+ 
     function tarjeta(p) {{
-      var card = document.createElement("div");
+      var card = document.createElement("button");
       card.className = "card";
-
-      var img = p.foto
-        ? '<img class="card-img" src="' + escapar(p.foto) + '" alt="' + escapar(p.nombre) + '" loading="lazy" onerror="this.outerHTML=\'<div class=card-img-vacia>Sin imagen</div>\'">'
-        : '<div class="card-img-vacia">Sin imagen</div>';
-
+      card.type = "button";
+ 
+      var foto = p.foto
+        ? '<div class="foto"><img src="' + escapar(p.foto) + '" alt="' + escapar(p.nombre) + '" loading="lazy" onerror="this.parentNode.outerHTML=\'<div class=foto-vacia>M</div>\'"></div>'
+        : '<div class="foto-vacia">M</div>';
+ 
       var meta = "";
-      if (p.material) meta += '<span>Material:</span> ' + escapar(p.material);
-      if (p.material && p.talla) meta += " &middot; ";
-      if (p.talla) meta += '<span>Talla:</span> ' + escapar(p.talla);
-
+      if (p.material) meta += '<b>Material</b> ' + escapar(p.material);
+      if (p.material && p.talla) meta += ' &nbsp;·&nbsp; ';
+      if (p.talla) meta += '<b>Talla</b> ' + escapar(p.talla);
+ 
       card.innerHTML =
-        img +
-        '<div class="card-cuerpo">' +
-          '<div class="card-nombre">' + escapar(p.nombre) + '</div>' +
-          (meta ? '<div class="card-meta">' + meta + '</div>' : '') +
-          (p.descripcion ? '<div class="card-desc">' + escapar(p.descripcion) + '</div>' : '') +
-          '<div class="card-pie">' +
-            '<span class="card-precio">' + escapar(p.precio) + '</span>' +
-            '<button class="btn-wa">Consultar</button>' +
+        foto +
+        '<div class="cuerpo">' +
+          '<div class="nombre">' + escapar(p.nombre) + '</div>' +
+          (meta ? '<div class="meta">' + meta + '</div>' : '') +
+          (p.descripcion ? '<div class="desc">' + escapar(p.descripcion) + '</div>' : '') +
+          '<div class="pie">' +
+            '<span class="precio">' + escapar(p.precio) + '</span>' +
+            '<span class="consultar">' + ICONO_WA + 'Consultar</span>' +
           '</div>' +
         '</div>';
-
-      card.querySelector(".btn-wa").addEventListener("click", function () {{
-        abrirWhatsApp(p.nombre, p.precio);
-      }});
-
+ 
+      card.addEventListener("click", function () {{ consultar(p); }});
       return card;
     }}
-
+ 
     function normalizar(t) {{
       return (t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     }}
-
+ 
     function render(lista) {{
       grilla.innerHTML = "";
       if (lista.length === 0) {{
@@ -428,12 +580,12 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
         return;
       }}
       vacio.style.display = "none";
-      contador.textContent = lista.length + (lista.length === 1 ? " producto" : " productos");
+      contador.textContent = lista.length + (lista.length === 1 ? " pieza" : " piezas");
       var frag = document.createDocumentFragment();
       lista.forEach(function (p) {{ frag.appendChild(tarjeta(p)); }});
       grilla.appendChild(frag);
     }}
-
+ 
     inputBuscar.addEventListener("input", function (e) {{
       var q = normalizar(e.target.value);
       if (!q) {{ render(PRODUCTOS); return; }}
@@ -443,7 +595,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       }});
       render(filtrados);
     }});
-
+ 
     render(PRODUCTOS);
   </script>
 </body>
