@@ -23,13 +23,8 @@ import {
   obtenerIniciales,
 } from "../utils"
 
-/* ============================================================
-   CONFIGURACIÓN — editá SOLO estos dos valores una vez.
-   Los sacás del panel de Cloudinary (ver instrucciones aparte).
-   ============================================================ */
-const CLOUDINARY_CLOUD_NAME = "TU_CLOUD_NAME"
+const CLOUDINARY_CLOUD_NAME = "zolcnxzz"
 const CLOUDINARY_UPLOAD_PRESET = "marue_productos"
-/* ============================================================ */
 
 const LIMITE_STOCK_BAJO = 10
 
