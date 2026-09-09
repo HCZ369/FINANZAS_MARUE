@@ -17,12 +17,15 @@ import {
   normalizarTexto,
   convertirNumero,
   valorParaInput,
-  formatearFecha,
   formatearMonto,
   formatearDecimal,
   formatearCantidad,
   obtenerIniciales,
 } from "../utils"
+
+
+const CLOUDINARY_CLOUD_NAME = "zolcnxzz"
+const CLOUDINARY_UPLOAD_PRESET = "marue_productos"
 
 const LIMITE_STOCK_BAJO = 10
 
@@ -47,6 +50,8 @@ const FORMULARIO_INICIAL = {
   imagenUrl: "",
   categoriaId: "",
   descripcion: "",
+  material: "",
+  talla: "",
   loteId: "",
   costoUsd: "",
   cantidadComprada: "",
@@ -59,6 +64,7 @@ function Catalogo({ negocioId }) {
   const [productos, setProductos] = useState([])
   const [stock, setStock] = useState([])
   const [categorias, setCategorias] = useState([])
+  const [lotes, setLotes] = useState([])
 
   const [busqueda, setBusqueda] = useState("")
   const [filtroStock, setFiltroStock] = useState(FILTROS_STOCK.TODOS)
@@ -76,6 +82,7 @@ function Catalogo({ negocioId }) {
   const [guardando, setGuardando] = useState(false)
   const [eliminando, setEliminando] = useState(false)
   const [calculandoSugerencia, setCalculandoSugerencia] = useState(false)
+  const [generandoCatalogo, setGenerandoCatalogo] = useState(false)
 
   const mostrarMensaje = useCallback((texto, tipo = "exito") => {
     if (temporizadorMensaje.current) {
@@ -95,6 +102,7 @@ function Catalogo({ negocioId }) {
     if (!negocioId) {
       setProductos([])
       setStock([])
+      setCategorias([])
       setLotes([])
       setCargando(false)
       return
@@ -173,6 +181,10 @@ function Catalogo({ negocioId }) {
         nombre: producto.nombre?.trim() || "Producto sin nombre",
         precio: convertirNumero(producto.precio),
         imagen_url: producto.imagen_url || "",
+        material: producto.material || "",
+        talla: producto.talla || "",
+        descripcion: producto.descripcion || "",
+        categoria_id: producto.categoria_id ?? "",
         costo_usd: producto.costo_usd ?? "",
         lote_id: producto.lote_id ?? "",
         cantidad_comprada: producto.cantidad_comprada ?? "",
@@ -282,10 +294,14 @@ function Catalogo({ negocioId }) {
     setFormulario({
       nombre: producto.nombre || "",
       precio: valorParaInput(producto.precio),
+      imagenUrl: producto.imagen_url || "",
+      categoriaId: valorParaInput(producto.categoria_id),
+      descripcion: producto.descripcion || "",
+      material: producto.material || "",
+      talla: producto.talla || "",
       loteId: valorParaInput(producto.lote_id),
       costoUsd: valorParaInput(producto.costo_usd),
       cantidadComprada: valorParaInput(producto.cantidad_comprada),
-      imagenUrl: producto.imagen_url || "",
     })
 
     setProductoAbiertoId(producto.id)
@@ -350,6 +366,41 @@ function Catalogo({ negocioId }) {
     setOrdenar(ORDENES.NOMBRE)
   }
 
+  async function generarCatalogo() {
+    try {
+      setGenerandoCatalogo(true)
+
+      const resultado = await apiPost(
+        `/negocios/${negocioId}/generar-catalogo/`,
+        {}
+      )
+
+      if (resultado?.url) {
+        mostrarMensaje("Catálogo publicado. Link copiado al portapapeles.")
+
+        try {
+          await navigator.clipboard.writeText(resultado.url)
+        } catch {
+          // Si el navegador no deja copiar, igual mostramos el link abierto
+        }
+
+        window.open(resultado.url, "_blank")
+      } else {
+        mostrarMensaje(
+          resultado?.mensaje || "El catálogo se generó, pero no llegó la URL.",
+          "error"
+        )
+      }
+    } catch (error) {
+      mostrarMensaje(
+        error?.message || "No se pudo generar el catálogo.",
+        "error"
+      )
+    } finally {
+      setGenerandoCatalogo(false)
+    }
+  }
+
   function validarFormulario() {
     if (!formulario.nombre.trim()) {
       return "El nombre del producto es obligatorio."
@@ -373,13 +424,6 @@ function Catalogo({ negocioId }) {
       return "La cantidad comprada no puede ser negativa."
     }
 
-    if (
-      formulario.imagenUrl.trim() &&
-      !esUrlValida(formulario.imagenUrl)
-    ) {
-      return "La dirección de la imagen no es válida."
-    }
-
     return null
   }
 
@@ -393,15 +437,20 @@ function Catalogo({ negocioId }) {
       return
     }
 
-      const datos = {
+    const datos = {
       nombre: formulario.nombre.trim(),
       precio: convertirNumero(formulario.precio),
       imagen_url: formulario.imagenUrl.trim() || null,
       categoria_id: formulario.categoriaId ? Number(formulario.categoriaId) : null,
       descripcion: formulario.descripcion.trim() || null,
+      material: formulario.material.trim() || null,
+      talla: formulario.talla.trim() || null,
       lote_id: formulario.loteId ? Number(formulario.loteId) : null,
       costo_usd: formulario.costoUsd !== "" ? convertirNumero(formulario.costoUsd) : null,
-      cantidad_comprada: formulario.cantidadComprada !== "" ? convertirNumero(formulario.cantidadComprada) : null,
+      cantidad_comprada:
+        formulario.cantidadComprada !== ""
+          ? convertirNumero(formulario.cantidadComprada)
+          : null,
     }
 
     try {
@@ -555,13 +604,24 @@ function Catalogo({ negocioId }) {
           </p>
         </div>
 
-        <button
-          type="button"
-          className="btn-principal"
-          onClick={abrirCreacion}
-        >
-          Nuevo producto
-        </button>
+        <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn-secundario"
+            onClick={generarCatalogo}
+            disabled={generandoCatalogo}
+          >
+            {generandoCatalogo ? "Publicando..." : "Generar catálogo"}
+          </button>
+
+          <button
+            type="button"
+            className="btn-principal"
+            onClick={abrirCreacion}
+          >
+            Nuevo producto
+          </button>
+        </div>
       </header>
 
       {mensaje && (
@@ -766,6 +826,7 @@ function Catalogo({ negocioId }) {
           onSugerencia={pedirSugerencia}
           onGuardar={guardarProducto}
           onCerrar={cerrarModal}
+          mostrarMensaje={mostrarMensaje}
         />
       )}
     </main>
@@ -925,19 +986,33 @@ function ModalProducto({
       </div>
 
       <div className="cat-detalle-informacion">
+        {producto.material && (
+          <div className="dato">
+            <span className="etiqueta">Material</span>
+            <span className="valor">{producto.material}</span>
+          </div>
+        )}
+
+        {producto.talla && (
+          <div className="dato">
+            <span className="etiqueta">Talla</span>
+            <span className="valor">{producto.talla}</span>
+          </div>
+        )}
+
+        {producto.descripcion && (
+          <div className="dato">
+            <span className="etiqueta">Descripción</span>
+            <span className="valor">{producto.descripcion}</span>
+          </div>
+        )}
+
         <div className="dato">
           <span className="etiqueta">Costo en USD</span>
           <span className="valor">
             {producto.costo_usd !== ""
               ? `USD ${formatearDecimal(producto.costo_usd)}`
               : "No registrado"}
-          </span>
-        </div>
-
-        <div className="dato">
-          <span className="etiqueta">Lote</span>
-          <span className="valor">
-            {producto.lote_id ? `Lote ${producto.lote_id}` : "Sin lote"}
           </span>
         </div>
       </div>
@@ -973,6 +1048,7 @@ function ModalFormularioProducto({
   onGuardar,
   onCerrar,
   sugerencia,
+  mostrarMensaje,
 }) {
   const esCreacion = modo === "crear"
 
@@ -997,20 +1073,49 @@ function ModalFormularioProducto({
           />
         </div>
 
+        <SubidorImagen
+          imagenUrl={formulario.imagenUrl}
+          onSubida={(url) => onCambiar("imagenUrl", url)}
+          onQuitar={() => onCambiar("imagenUrl", "")}
+          mostrarMensaje={mostrarMensaje}
+        />
+
         <div className="campo">
-          <label htmlFor="producto-imagen">URL de imagen</label>
-          <input
-            id="producto-imagen"
-            type="url"
-            value={formulario.imagenUrl}
-            onChange={(evento) => onCambiar("imagenUrl", evento.target.value)}
-            placeholder="https://ejemplo.com/producto.jpg"
+          <label htmlFor="producto-descripcion">Descripción</label>
+          <textarea
+            id="producto-descripcion"
+            value={formulario.descripcion}
+            onChange={(evento) => onCambiar("descripcion", evento.target.value)}
+            placeholder="Detalle que se muestra en el catálogo"
+            maxLength={500}
+            rows={3}
           />
-          {formulario.imagenUrl.trim() && (
-            <div className="cat-preview-img">
-              <ImagenProducto src={formulario.imagenUrl} alt="Vista previa" />
-            </div>
-          )}
+        </div>
+
+        <div className="grid-form-config">
+          <div className="campo">
+            <label htmlFor="producto-material">Material</label>
+            <input
+              id="producto-material"
+              type="text"
+              value={formulario.material}
+              onChange={(evento) => onCambiar("material", evento.target.value)}
+              placeholder="Acero quirúrgico, cuero..."
+              maxLength={200}
+            />
+          </div>
+
+          <div className="campo">
+            <label htmlFor="producto-talla">Talla</label>
+            <input
+              id="producto-talla"
+              type="text"
+              value={formulario.talla}
+              onChange={(evento) => onCambiar("talla", evento.target.value)}
+              placeholder="Única, ajustable, 45cm..."
+              maxLength={100}
+            />
+          </div>
         </div>
 
         <div className="grid-form-config">
@@ -1129,6 +1234,99 @@ function ModalFormularioProducto({
         </div>
       </form>
     </Modal>
+  )
+}
+
+function SubidorImagen({ imagenUrl, onSubida, onQuitar, mostrarMensaje }) {
+  const inputRef = useRef(null)
+  const [subiendo, setSubiendo] = useState(false)
+
+  async function manejarArchivo(evento) {
+    const archivo = evento.target.files?.[0]
+    if (!archivo) return
+
+    if (!archivo.type.startsWith("image/")) {
+      mostrarMensaje?.("El archivo debe ser una imagen.", "error")
+      return
+    }
+
+    // Límite de seguridad: 10 MB
+    if (archivo.size > 10 * 1024 * 1024) {
+      mostrarMensaje?.("La imagen es muy grande (máximo 10 MB).", "error")
+      return
+    }
+
+    try {
+      setSubiendo(true)
+
+      const datos = new FormData()
+      datos.append("file", archivo)
+      datos.append("upload_preset", CLOUDINARY_UPLOAD_PRESET)
+
+      const respuesta = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: "POST", body: datos }
+      )
+
+      if (!respuesta.ok) {
+        throw new Error("No se pudo subir la imagen")
+      }
+
+      const resultado = await respuesta.json()
+      onSubida(resultado.secure_url)
+    } catch (error) {
+      mostrarMensaje?.("Error al subir la foto. Intentá de nuevo.", "error")
+    } finally {
+      setSubiendo(false)
+      if (inputRef.current) {
+        inputRef.current.value = ""
+      }
+    }
+  }
+
+  return (
+    <div className="campo">
+      <label>Foto del producto</label>
+
+      {imagenUrl && (
+        <div className="cat-preview-img" style={{ marginBottom: "0.5rem" }}>
+          <ImagenProducto src={imagenUrl} alt="Vista previa" />
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="btn-secundario"
+          onClick={() => inputRef.current?.click()}
+          disabled={subiendo}
+        >
+          {subiendo
+            ? "Subiendo..."
+            : imagenUrl
+              ? "Cambiar foto"
+              : "Subir foto"}
+        </button>
+
+        {imagenUrl && !subiendo && (
+          <button
+            type="button"
+            className="btn-borrar"
+            onClick={onQuitar}
+          >
+            Quitar foto
+          </button>
+        )}
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        onChange={manejarArchivo}
+        style={{ display: "none" }}
+      />
+    </div>
   )
 }
 
@@ -1295,15 +1493,6 @@ function obtenerColorProducto(nombre) {
   }
 
   return colores[Math.abs(hash) % colores.length]
-}
-
-function esUrlValida(valor) {
-  try {
-    const url = new URL(valor)
-    return url.protocol === "http:" || url.protocol === "https:"
-  } catch {
-    return false
-  }
 }
 
 export default Catalogo

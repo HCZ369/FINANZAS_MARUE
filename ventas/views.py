@@ -69,6 +69,7 @@ class ProductosView(APIView):
     def get(self, request, negocio_id):
         query = """
             SELECT p.id, p.negocio_id, p.nombre, p.precio, p.imagen_url, p.estado,
+                   p.material, p.talla, p.descripcion, p.categoria_id,
                    COALESCE(compras.total, 0) AS cantidad_comprada,
                    COALESCE(ventas_total.total, 0) AS cantidad_vendida,
                    COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock
@@ -95,13 +96,15 @@ class ProductosView(APIView):
         imagen_url = request.data.get("imagen_url")
         categoria_id = request.data.get("categoria_id")
         descripcion = request.data.get("descripcion")
+        material = request.data.get("material")
+        talla = request.data.get("talla")
 
         query = """
-            INSERT INTO producto (negocio_id, nombre, precio, imagen_url, categoria_id, descripcion)
+            INSERT INTO producto (negocio_id, nombre, precio, imagen_url, categoria_id, descripcion, material, talla)
             OUTPUT INSERTED.id
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
-        parametros = [negocio_id, nombre, precio, imagen_url, categoria_id, descripcion]
+        parametros = [negocio_id, nombre, precio, imagen_url, categoria_id, descripcion, material, talla]
         producto_id = execute_insert(query, parametros)
 
         lote_id = request.data.get("lote_id")
@@ -151,9 +154,16 @@ class ProductoDetalleView(APIView):
         imagen_url = request.data.get("imagen_url")
         categoria_id = request.data.get("categoria_id")
         descripcion = request.data.get("descripcion")
+        material = request.data.get("material")      
+        talla = request.data.get("talla")            
 
-        query = "UPDATE producto SET nombre = %s, precio = %s, imagen_url = %s, categoria_id = %s, descripcion = %s WHERE id = %s AND negocio_id = %s"
-        parametros = [nombre, precio, imagen_url, categoria_id, descripcion, producto_id, negocio_id]
+        query = """
+            UPDATE producto
+               SET nombre = %s, precio = %s, imagen_url = %s, categoria_id = %s,
+                   descripcion = %s, material = %s, talla = %s
+             WHERE id = %s AND negocio_id = %s
+        """
+        parametros = [nombre, precio, imagen_url, categoria_id, descripcion, material, talla, producto_id, negocio_id]
 
         filas_afectadas = execute_command(query, parametros)
 
