@@ -248,7 +248,7 @@ function Catalogo({ negocioId }) {
         (total, item) =>
           total +
           convertirNumero(item.precio_vendido) *
-            Math.max(1, convertirNumero(item.cantidad, 1)),
+          Math.max(1, convertirNumero(item.cantidad, 1)),
         0
       ),
     }
@@ -369,27 +369,45 @@ function Catalogo({ negocioId }) {
     try {
       setGenerandoCatalogo(true)
 
-      const resultado = await apiPost(
-        `/negocios/${negocioId}/generar-catalogo/`,
-        {}
+      // URL de tu backend (la misma base que usa el resto de la app).
+      // Si tu apiPost apunta a ngrok, poné esa URL acá también.
+      const API_BASE = "https://cornflake-exorcist-facsimile.ngrok-free.dev"
+
+      const respuesta = await fetch(
+        `${API_BASE}/api/negocios/${negocioId}/generar-catalogo/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: "{}",
+        }
       )
 
-      if (resultado?.url) {
-        mostrarMensaje("Catálogo publicado. Link copiado al portapapeles.")
-
+      if (!respuesta.ok) {
+        let msg = "No se pudo generar el catálogo."
         try {
-          await navigator.clipboard.writeText(resultado.url)
+          const data = await respuesta.json()
+          msg = data?.error || msg
         } catch {
-          // Si el navegador no deja copiar, igual mostramos el link abierto
+          // sin cuerpo JSON
         }
-
-        window.open(resultado.url, "_blank")
-      } else {
-        mostrarMensaje(
-          resultado?.mensaje || "El catálogo se generó, pero no llegó la URL.",
-          "error"
-        )
+        mostrarMensaje(msg, "error")
+        return
       }
+
+      const blob = await respuesta.blob()
+      const url = URL.createObjectURL(blob)
+      const enlace = document.createElement("a")
+      enlace.href = url
+      enlace.download = "index.html"
+      document.body.appendChild(enlace)
+      enlace.click()
+      document.body.removeChild(enlace)
+      URL.revokeObjectURL(url)
+
+      mostrarMensaje("Catálogo descargado. Arrastralo a Netlify para publicarlo.")
     } catch (error) {
       mostrarMensaje(
         error?.message || "No se pudo generar el catálogo.",
@@ -459,15 +477,15 @@ function Catalogo({ negocioId }) {
         modalFormulario === "crear"
           ? await apiPost(`/negocios/${negocioId}/productos/`, datos)
           : await apiPut(
-              `/negocios/${negocioId}/productos/${productoAbiertoId}/`,
-              datos
-            )
+            `/negocios/${negocioId}/productos/${productoAbiertoId}/`,
+            datos
+          )
 
       mostrarMensaje(
         resultado?.mensaje ||
-          (modalFormulario === "crear"
-            ? "Producto creado correctamente."
-            : "Producto actualizado correctamente.")
+        (modalFormulario === "crear"
+          ? "Producto creado correctamente."
+          : "Producto actualizado correctamente.")
       )
 
       cerrarModalForzado()
@@ -610,7 +628,7 @@ function Catalogo({ negocioId }) {
             onClick={generarCatalogo}
             disabled={generandoCatalogo}
           >
-            {generandoCatalogo ? "Publicando..." : "Generar catálogo"}
+            {generandoCatalogo ? "Generando..." : "Descargar catálogo"}
           </button>
 
           <button
@@ -725,14 +743,14 @@ function Catalogo({ negocioId }) {
           {(busqueda ||
             filtroStock !== FILTROS_STOCK.TODOS ||
             ordenar !== ORDENES.NOMBRE) && (
-            <button
-              type="button"
-              className="cat-limpiar-filtros"
-              onClick={limpiarFiltros}
-            >
-              Limpiar filtros
-            </button>
-          )}
+              <button
+                type="button"
+                className="cat-limpiar-filtros"
+                onClick={limpiarFiltros}
+              >
+                Limpiar filtros
+              </button>
+            )}
         </div>
       </section>
 
@@ -758,9 +776,8 @@ function Catalogo({ negocioId }) {
           descripcion={
             productosCompletos.length === 0
               ? "Creá el primer producto para comenzar a utilizar el catálogo."
-              : `No hay coincidencias para los filtros seleccionados${
-                  busqueda.trim() ? ` y la búsqueda "${busqueda.trim()}"` : ""
-                }.`
+              : `No hay coincidencias para los filtros seleccionados${busqueda.trim() ? ` y la búsqueda "${busqueda.trim()}"` : ""
+              }.`
           }
           mostrarBoton={productosCompletos.length === 0}
           onCrear={abrirCreacion}
