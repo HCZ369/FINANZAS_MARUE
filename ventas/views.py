@@ -622,6 +622,42 @@ TEXTOS_NEGOCIO = {
     3: {"titulo": "Marué Lab", "subtitulo": "Cartucheras porta-cuchillos artesanales"},
 }
 
+class InversionPorLoteView(APIView):
+    def get(self, request, negocio_id):
+        # Resumen por lote: cantidad de productos, unidades e inversión total
+        query_resumen = """
+            SELECT l.id AS lote_id,
+                   l.fecha,
+                   l.descripcion,
+                   l.tasa_cambio,
+                   COUNT(lp.id) AS productos_distintos,
+                   COALESCE(SUM(lp.cantidad_comprada), 0) AS unidades,
+                   COALESCE(SUM(lp.costo * lp.cantidad_comprada), 0) AS inversion_gs,
+                   COALESCE(SUM(lp.costo_usd * lp.cantidad_comprada), 0) AS inversion_usd
+              FROM lote l
+              LEFT JOIN lote_producto lp ON lp.lote_id = l.id
+             WHERE l.negocio_id = %s
+             GROUP BY l.id, l.fecha, l.descripcion, l.tasa_cambio
+             ORDER BY l.fecha DESC
+        """
+        lotes = fetch_all(query_resumen, [negocio_id])
+
+        # Detalle de productos por cada lote
+        for lote in lotes:
+            query_detalle = """
+                SELECT p.nombre AS producto,
+                       lp.cantidad_comprada AS cantidad,
+                       lp.costo_usd,
+                       lp.costo AS costo_gs,
+                       (lp.costo * lp.cantidad_comprada) AS subtotal_gs
+                  FROM lote_producto lp
+                  JOIN producto p ON p.id = lp.producto_id
+                 WHERE lp.lote_id = %s
+                 ORDER BY p.nombre
+            """
+            lote["productos"] = fetch_all(query_detalle, [lote["lote_id"]])
+
+        return Response(lotes)
 
 class GenerarCatalogoView(APIView):
     def post(self, request, negocio_id):
@@ -668,6 +704,8 @@ class GenerarCatalogoView(APIView):
 
         return Response(respuesta)
 
+    
+
     def obtener_productos_con_stock(self, negocio_id):
         query = """
             SELECT p.id, p.nombre, p.precio, p.imagen_url,
@@ -696,6 +734,8 @@ class GenerarCatalogoView(APIView):
             if stock > 0:
                 disponibles.append(r)
         return disponibles
+
+    
 
     def construir_html(self, negocio_id, nombre_negocio, productos):
         textos = TEXTOS_NEGOCIO.get(
