@@ -3,6 +3,7 @@ import GraficoGastos from "../components/GraficoGastos"
 import GraficoEvolucion from "../components/GraficoEvolucion"
 import TablaTopProductos from "../components/TablaTopProductos"
 import GraficoProyeccion from "../components/GraficoProyeccion"
+import InversionLotes from "../components/InversionLotes"
 
 function Dashboard({ negocioId }) {
   if (!negocioId) {
@@ -54,6 +55,14 @@ function Dashboard({ negocioId }) {
           className="dashboard-panel-completo"
         >
           <GraficoProyeccion negocioId={negocioId} />
+        </PanelDashboard>
+
+        <PanelDashboard
+          titulo="Inversión por lote"
+          descripcion="Cuánto costó cada lote y su detalle de productos."
+          className="dashboard-panel-completo"
+        >
+          <InversionLotes negocioId={negocioId} />
         </PanelDashboard>
 
         <PanelDashboard
