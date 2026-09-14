@@ -18,4 +18,6 @@ urlpatterns = [
     path("lotes/<int:lote_id>/productos/<int:lote_producto_id>/", views.LoteProductoDetalleView.as_view(), name="lote_producto_detalle"),
     path("inversion-lotes/", views.InversionPorLoteView.as_view(), name="inversion_lotes"),
     path("generar-catalogo/", views.GenerarCatalogoView.as_view(), name="generar_catalogo"),
+    path("cuentas/", views.CuentasView.as_view(), name="cuentas"),
+    path("movimientos/", views.MovimientosView.as_view(), name="movimientos"),
 ]

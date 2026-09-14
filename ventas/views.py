@@ -1,8 +1,12 @@
+import os
+import io
+import json
+import html as html_lib
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from core.db import fetch_all, fetch_one, execute_command, execute_insert
+from core.db import fetch_all, execute_command, fetch_one, execute_insert
 from django.db import transaction
-
+from django.http import HttpResponse
 
 class ClientesView(APIView):
     def get(self, request, negocio_id):
@@ -153,10 +157,18 @@ class ProductoDetalleView(APIView):
         imagen_url = request.data.get("imagen_url")
         categoria_id = request.data.get("categoria_id")
         descripcion = request.data.get("descripcion")
-        en_catalogo = request.data.get("en_catalogo", True)
+        material = request.data.get("material")
+        talla = request.data.get("talla")
+        en_catalogo_raw = request.data.get("en_catalogo", True)
+        en_catalogo = 1 if en_catalogo_raw in (True, 1, "1", "true", "True") else 0
 
-        query = "UPDATE producto SET nombre = %s, precio = %s, imagen_url = %s, categoria_id = %s, descripcion = %s, en_catalogo = %s WHERE id = %s AND negocio_id = %s"
-        parametros = [nombre, precio, imagen_url, categoria_id, descripcion, producto_id, negocio_id]
+        query = """
+            UPDATE producto
+               SET nombre = %s, precio = %s, imagen_url = %s, categoria_id = %s,
+                   descripcion = %s, material = %s, talla = %s, en_catalogo = %s
+             WHERE id = %s AND negocio_id = %s
+        """
+        parametros = [nombre, precio, imagen_url, categoria_id, descripcion, material, talla, en_catalogo, producto_id, negocio_id]
 
         filas_afectadas = execute_command(query, parametros)
 
@@ -556,7 +568,7 @@ class SugerenciaPrecioView(APIView):
             multiplicador = 2.2
 
         packaging = 5000
-        precio_sugerido = (round(costo_unitario) * multiplicador) + packaging 
+        precio_sugerido = (round(costo_unitario) * multiplicador) + packaging
 
         respuesta = {
             "costo_unitario": costo_unitario,
@@ -590,3 +602,428 @@ class StockView(APIView):
         """
         resultados = fetch_all(query, [negocio_id])
         return Response(resultados)
+
+class InversionPorLoteView(APIView):
+    def get(self, request, negocio_id):
+        query_resumen = """
+            SELECT l.id AS lote_id,
+                   l.fecha,
+                   l.descripcion,
+                   l.tasa_cambio,
+                   COUNT(lp.id) AS productos_distintos,
+                   COALESCE(SUM(lp.cantidad_comprada), 0) AS unidades,
+                   COALESCE(SUM(lp.costo * lp.cantidad_comprada), 0) AS inversion_gs,
+                   COALESCE(SUM(lp.costo_usd * lp.cantidad_comprada), 0) AS inversion_usd
+              FROM lote l
+              LEFT JOIN lote_producto lp ON lp.lote_id = l.id
+             WHERE l.negocio_id = %s
+             GROUP BY l.id, l.fecha, l.descripcion, l.tasa_cambio
+             ORDER BY l.fecha DESC
+        """
+        lotes = fetch_all(query_resumen, [negocio_id])
+
+        for lote in lotes:
+            query_detalle = """
+                SELECT p.nombre AS producto,
+                       lp.cantidad_comprada AS cantidad,
+                       lp.costo_usd,
+                       lp.costo AS costo_gs,
+                       (lp.costo * lp.cantidad_comprada) AS subtotal_gs
+                  FROM lote_producto lp
+                  JOIN producto p ON p.id = lp.producto_id
+                 WHERE lp.lote_id = %s
+                 ORDER BY p.nombre
+            """
+            lote["productos"] = fetch_all(query_detalle, [lote["lote_id"]])
+
+        return Response(lotes)
+NUMERO_WHATSAPP = "595992188322"
+
+TEXTOS_NEGOCIO = {
+    1: {"titulo": "Marué Dark", "subtitulo": "Joyería oscura y artículos de cuero hechos a mano"},
+    2: {"titulo": "Marué", "subtitulo": "Catálogo de productos"},
+    3: {"titulo": "Marué Lab", "subtitulo": "Cartucheras porta-cuchillos artesanales"},
+}
+
+
+class GenerarCatalogoView(APIView):
+    def post(self, request, negocio_id):
+        return self._generar(negocio_id)
+
+    def get(self, request, negocio_id):
+        return self._generar(negocio_id)
+
+    def _generar(self, negocio_id):
+        negocio = fetch_one("SELECT id, nombre FROM negocio WHERE id = %s", [negocio_id])
+        if negocio is None:
+            return Response({"error": "Negocio no encontrado"}, status=404)
+
+        productos = self.obtener_productos_con_stock(negocio_id)
+        if len(productos) == 0:
+            return Response({"error": "No hay productos con stock disponible."}, status=400)
+
+        html_catalogo = self.construir_html(negocio_id, negocio["nombre"], productos)
+        respuesta = HttpResponse(html_catalogo, content_type="text/html; charset=utf-8")
+        respuesta["Content-Disposition"] = 'attachment; filename="index.html"'
+        return respuesta
+
+    def obtener_productos_con_stock(self, negocio_id):
+        query = """
+            SELECT p.id, p.nombre, p.precio, p.imagen_url,
+                   p.material, p.talla, p.descripcion,
+                   COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock
+              FROM producto p
+              LEFT JOIN (SELECT producto_id, SUM(cantidad_comprada) AS total FROM lote_producto GROUP BY producto_id) compras ON compras.producto_id = p.id
+              LEFT JOIN (SELECT producto_id, SUM(cantidad) AS total FROM venta_detalle GROUP BY producto_id) ventas_total ON ventas_total.producto_id = p.id
+             WHERE p.negocio_id = %s
+               AND p.estado = 'activo'
+               AND p.en_catalogo = 1
+             ORDER BY p.nombre
+        """
+        registros = fetch_all(query, [negocio_id])
+        return [r for r in registros if (r.get("stock") or 0) > 0]
+
+    def construir_html(self, negocio_id, nombre_negocio, productos):
+        textos = TEXTOS_NEGOCIO.get(negocio_id, {"titulo": nombre_negocio, "subtitulo": "Catálogo de productos"})
+
+        productos_publicos = []
+        for p in productos:
+            productos_publicos.append({
+                "nombre": p.get("nombre") or "",
+                "precio": self.formatear_guaranies(p.get("precio")),
+                "material": p.get("material") or "",
+                "talla": p.get("talla") or "",
+                "descripcion": p.get("descripcion") or "",
+                "foto": self.optimizar_cloudinary(p.get("imagen_url") or ""),
+            })
+
+        productos_json = json.dumps(productos_publicos, ensure_ascii=False)
+
+        return PLANTILLA_HTML.format(
+            titulo=html_lib.escape(textos["titulo"]),
+            subtitulo=html_lib.escape(textos["subtitulo"]),
+            productos_json=productos_json,
+            numero_whatsapp=NUMERO_WHATSAPP,
+        )
+
+    def formatear_guaranies(self, valor):
+        if valor is None:
+            return ""
+        try:
+            n = int(round(float(valor)))
+        except (ValueError, TypeError):
+            return str(valor)
+        return "₲ " + f"{n:,}".replace(",", ".")
+
+    def optimizar_cloudinary(self, url):
+        if not url or "res.cloudinary.com" not in url or "/upload/" not in url:
+            return url
+        if "f_auto" in url:
+            return url
+        return url.replace("/upload/", "/upload/f_auto,q_auto/")
+# Pegar esta línea al FINAL de ventas/views.py, después de todas las clases:
+
+PLANTILLA_HTML = r"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{titulo}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {{ box-sizing: border-box; }}
+    * {{ margin: 0; padding: 0; }}
+    :root {{
+      --negro: #060506; --negro-2: #0b090b; --panel: #100d10;
+      --borde: #241d24; --borde-luz: #3a2d38;
+      --hueso: #e7e0e4; --hueso-tenue: #a99ea6; --ceniza: #6f6570;
+      --vino: #7c3a4e; --vino-1: #8a3a50; --vino-2: #b06074;
+    }}
+    html {{ background: var(--negro); scrollbar-color: #2a2029 var(--negro); }}
+    body {{
+      font-family: "Jost", "Segoe UI", sans-serif;
+      background: radial-gradient(ellipse at 50% -10%, #16101580 0%, transparent 60%), var(--negro);
+      color: var(--hueso); -webkit-font-smoothing: antialiased; min-height: 100vh;
+    }}
+    ::-webkit-scrollbar {{ width: 9px; }}
+    ::-webkit-scrollbar-track {{ background: var(--negro); }}
+    ::-webkit-scrollbar-thumb {{ background: #2a2029; border: 2px solid var(--negro); }}
+    .wrap {{ max-width: 1100px; margin: 0 auto; padding: 2.5rem 1.1rem 4.5rem; }}
+    .head {{ text-align: center; margin-bottom: 2.75rem; }}
+    .head::after {{
+      content: ""; display: block; width: 54px; height: 1px; margin: 1.15rem auto 0;
+      background: linear-gradient(90deg, transparent, var(--vino-2), transparent);
+    }}
+    .head h1 {{
+      font-family: "Cinzel", serif; font-weight: 600;
+      font-size: clamp(1.7rem, 7vw, 2.9rem);
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--hueso); line-height: 1.1;
+    }}
+    .head .sub {{
+      font-family: "Cormorant Garamond", serif; font-style: italic;
+      font-size: clamp(0.95rem, 3.5vw, 1.15rem); color: var(--hueso-tenue);
+      margin-top: 0.7rem; letter-spacing: 0.02em;
+    }}
+    .buscador {{ display: flex; justify-content: center; margin-bottom: 1.4rem; }}
+    .buscador input {{
+      width: 100%; max-width: 380px; padding: 0.7rem 1rem;
+      background: var(--panel); border: 1px solid var(--borde); border-radius: 2px;
+      color: var(--hueso); font-family: "Jost", sans-serif; font-size: 0.9rem;
+      letter-spacing: 0.03em; outline: none;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }}
+    .buscador input::placeholder {{ color: var(--ceniza); letter-spacing: 0.06em; }}
+    .buscador input:focus {{ border-color: var(--vino-1); box-shadow: 0 0 0 1px var(--vino) inset; }}
+    .contador {{
+      text-align: center; color: var(--ceniza); font-size: 0.72rem;
+      letter-spacing: 0.22em; text-transform: uppercase; margin-bottom: 2.2rem;
+    }}
+    .grilla {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem; }}
+    @media (min-width: 620px) {{ .grilla {{ grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }} }}
+    @media (min-width: 900px) {{ .grilla {{ grid-template-columns: repeat(4, 1fr); }} }}
+    .card {{
+      position: relative; display: flex; flex-direction: column;
+      background: linear-gradient(180deg, var(--panel) 0%, var(--negro-2) 100%);
+      border: 1px solid var(--borde); border-radius: 2px; overflow: hidden;
+      cursor: pointer; text-align: left; width: 100%; font: inherit; color: inherit;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+    }}
+    .card::before {{
+      content: ""; position: absolute; inset: 0; border: 1px solid transparent;
+      pointer-events: none; transition: border-color 200ms ease; z-index: 2;
+    }}
+    .card:hover, .card:active, .card:focus-visible {{
+      border-color: var(--borde-luz); transform: translateY(-3px);
+      box-shadow: 0 10px 30px -12px #000, 0 0 22px -14px var(--vino-2); outline: none;
+    }}
+    .card:hover::before, .card:active::before, .card:focus-visible::before {{
+      border-color: #5a3f4d55; inset: 5px;
+    }}
+    .foto {{ position: relative; width: 100%; aspect-ratio: 1 / 1; background: var(--negro-2); overflow: hidden; }}
+    .foto img {{
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      filter: saturate(0.92) contrast(1.04);
+      transition: transform 450ms ease, filter 300ms ease;
+    }}
+    .card:hover .foto img, .card:active .foto img {{ transform: scale(1.05); filter: saturate(1) contrast(1.06); }}
+    .foto::after {{
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(180deg, transparent 55%, #060506d9 100%); pointer-events: none;
+    }}
+    .foto-vacia {{
+      width: 100%; aspect-ratio: 1 / 1;
+      background: repeating-linear-gradient(45deg, #0d0a0d 0 10px, #0a080a 10px 20px);
+      display: flex; align-items: center; justify-content: center; color: var(--ceniza);
+      font-family: "Cinzel", serif; font-size: 1.6rem; letter-spacing: 0.1em;
+    }}
+    .cuerpo {{ display: flex; flex-direction: column; gap: 0.4rem; padding: 0.75rem 0.8rem 0.85rem; flex-grow: 1; }}
+    .nombre {{
+      font-family: "Cormorant Garamond", serif; font-weight: 500; font-size: 1.02rem;
+      line-height: 1.2; color: var(--hueso); letter-spacing: 0.01em;
+    }}
+    .meta {{ font-size: 0.68rem; color: var(--hueso-tenue); letter-spacing: 0.05em; line-height: 1.5; }}
+    .meta b {{ color: var(--ceniza); font-weight: 400; }}
+    .desc {{
+      font-size: 0.7rem; color: var(--ceniza); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }}
+    .pie {{
+      display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;
+      margin-top: auto; padding-top: 0.6rem; border-top: 1px solid var(--borde);
+    }}
+    .precio {{
+      font-family: "Cinzel", serif; font-weight: 500; font-size: 0.92rem;
+      color: var(--vino-2); letter-spacing: 0.03em; white-space: nowrap;
+    }}
+    .consultar {{
+      font-size: 0.62rem; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--hueso-tenue); display: flex; align-items: center; gap: 0.3rem;
+      transition: color 200ms ease;
+    }}
+    .card:hover .consultar, .card:active .consultar {{ color: var(--vino-2); }}
+    .consultar svg {{ width: 12px; height: 12px; display: block; }}
+    .vacio {{
+      text-align: center; color: var(--ceniza); font-family: "Cormorant Garamond", serif;
+      font-style: italic; font-size: 1.1rem; padding: 3.5rem 1rem;
+    }}
+    .footer {{
+      text-align: center; color: #4d454d; font-size: 0.64rem;
+      letter-spacing: 0.2em; text-transform: uppercase; margin-top: 3.5rem;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="head">
+      <h1>{titulo}</h1>
+      <p class="sub">{subtitulo}</p>
+    </header>
+    <div class="buscador">
+      <input type="text" id="buscar" placeholder="Buscar pieza o material" autocomplete="off">
+    </div>
+    <div class="contador" id="contador"></div>
+    <div class="grilla" id="grilla"></div>
+    <div class="vacio" id="vacio" style="display:none;">No se encontraron piezas.</div>
+    <footer class="footer">Precios en guaraníes &middot; Consultas por WhatsApp</footer>
+  </div>
+  <script>
+    var PRODUCTOS = {productos_json};
+    var WHATSAPP = "{numero_whatsapp}";
+    var grilla = document.getElementById("grilla");
+    var vacio = document.getElementById("vacio");
+    var contador = document.getElementById("contador");
+    var inputBuscar = document.getElementById("buscar");
+
+    function escapar(t) {{
+      var d = document.createElement("div");
+      d.textContent = t == null ? "" : String(t);
+      return d.innerHTML;
+    }}
+    function consultar(p) {{
+      var texto = "Hola! Me interesa esta pieza: " + p.nombre + " (" + p.precio + ")";
+      var url = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(texto);
+      window.open(url, "_blank");
+    }}
+    var ICONO_WA =
+      '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+      '<path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 20zm4.4-6c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.7.9-.3.2-.5.1a6.5 6.5 0 0 1-3.2-2.8c-.2-.4.2-.4.6-1.2.1-.2 0-.3 0-.4l-.7-1.7c-.2-.5-.4-.4-.5-.4h-.5a1 1 0 0 0-.7.3A2.9 2.9 0 0 0 6.4 10a5 5 0 0 0 1.1 2.7 11.5 11.5 0 0 0 4.4 3.9c2 .8 2 .6 2.4.5a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .1-1.2c-.1-.1-.2-.2-.4-.3z"/>' +
+      '</svg>';
+
+    function tarjeta(p) {{
+      var card = document.createElement("button");
+      card.className = "card"; card.type = "button";
+      var foto = p.foto
+        ? '<div class="foto"><img src="' + escapar(p.foto) + '" alt="' + escapar(p.nombre) + '" loading="lazy" onerror="this.parentNode.outerHTML=\'<div class=foto-vacia>M</div>\'"></div>'
+        : '<div class="foto-vacia">M</div>';
+      var meta = "";
+      if (p.material) meta += '<b>Material</b> ' + escapar(p.material);
+      if (p.material && p.talla) meta += ' &nbsp;·&nbsp; ';
+      if (p.talla) meta += '<b>Talla</b> ' + escapar(p.talla);
+      card.innerHTML =
+        foto +
+        '<div class="cuerpo">' +
+          '<div class="nombre">' + escapar(p.nombre) + '</div>' +
+          (meta ? '<div class="meta">' + meta + '</div>' : '') +
+          (p.descripcion ? '<div class="desc">' + escapar(p.descripcion) + '</div>' : '') +
+          '<div class="pie">' +
+            '<span class="precio">' + escapar(p.precio) + '</span>' +
+            '<span class="consultar">' + ICONO_WA + 'Consultar</span>' +
+          '</div>' +
+        '</div>';
+      card.addEventListener("click", function () {{ consultar(p); }});
+      return card;
+    }}
+    function normalizar(t) {{
+      return (t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }}
+    function render(lista) {{
+      grilla.innerHTML = "";
+      if (lista.length === 0) {{
+        vacio.style.display = "block"; contador.textContent = ""; return;
+      }}
+      vacio.style.display = "none";
+      contador.textContent = lista.length + (lista.length === 1 ? " pieza" : " piezas");
+      var frag = document.createDocumentFragment();
+      lista.forEach(function (p) {{ frag.appendChild(tarjeta(p)); }});
+      grilla.appendChild(frag);
+    }}
+    inputBuscar.addEventListener("input", function (e) {{
+      var q = normalizar(e.target.value);
+      if (!q) {{ render(PRODUCTOS); return; }}
+      var filtrados = PRODUCTOS.filter(function (p) {{
+        return normalizar(p.nombre).indexOf(q) !== -1 || normalizar(p.material).indexOf(q) !== -1;
+      }});
+      render(filtrados);
+    }});
+    render(PRODUCTOS);
+  </script>
+</body>
+</html>
+"""
+
+class CuentasView(APIView):
+    def get(self, request, negocio_id):
+        # Trae cuentas del negocio + cuentas generales (negocio_id NULL)
+        query = """
+            SELECT c.id, c.negocio_id, c.nombre, c.tipo, c.saldo_inicial,
+                   c.saldo_inicial
+                   + COALESCE((SELECT SUM(m.monto) FROM movimiento m WHERE m.cuenta_id = c.id AND m.tipo = 'entrada'), 0)
+                   - COALESCE((SELECT SUM(m.monto) FROM movimiento m WHERE m.cuenta_id = c.id AND m.tipo = 'salida'), 0)
+                   + COALESCE((SELECT SUM(m.monto) FROM movimiento m WHERE m.cuenta_destino_id = c.id AND m.tipo = 'transferencia'), 0)
+                   - COALESCE((SELECT SUM(m.monto) FROM movimiento m WHERE m.cuenta_id = c.id AND m.tipo = 'transferencia'), 0)
+                   AS saldo_actual
+              FROM cuenta c
+             WHERE c.negocio_id = %s OR c.negocio_id IS NULL
+             ORDER BY c.nombre
+        """
+        cuentas = fetch_all(query, [negocio_id])
+        return Response(cuentas)
+
+    def post(self, request, negocio_id):
+        nombre = request.data.get("nombre")
+        tipo = request.data.get("tipo", "banco")
+        saldo_inicial = request.data.get("saldo_inicial", 0)
+
+        query = """
+            INSERT INTO cuenta (negocio_id, nombre, tipo, saldo_inicial, fecha_creacion)
+            OUTPUT INSERTED.id
+            VALUES (%s, %s, %s, %s, CAST(GETDATE() AS DATE))
+        """
+        cuenta_id = execute_insert(query, [negocio_id, nombre, tipo, saldo_inicial])
+        return Response({"mensaje": "Cuenta creada", "cuenta_id": cuenta_id})
+
+
+class MovimientosView(APIView):
+    def get(self, request, negocio_id):
+        # Movimientos de cuentas del negocio (o generales)
+        cuenta_id = request.query_params.get("cuenta_id")
+
+        if cuenta_id:
+            query = """
+                SELECT m.id, m.cuenta_id, m.tipo, m.monto, m.fecha, m.concepto,
+                       m.referencia_tipo, m.referencia_id, m.cuenta_destino_id,
+                       c.nombre AS cuenta_nombre,
+                       cd.nombre AS cuenta_destino_nombre
+                  FROM movimiento m
+                  JOIN cuenta c ON c.id = m.cuenta_id
+                  LEFT JOIN cuenta cd ON cd.id = m.cuenta_destino_id
+                 WHERE m.cuenta_id = %s OR m.cuenta_destino_id = %s
+                 ORDER BY m.fecha DESC, m.id DESC
+            """
+            movs = fetch_all(query, [cuenta_id, cuenta_id])
+        else:
+            query = """
+                SELECT m.id, m.cuenta_id, m.tipo, m.monto, m.fecha, m.concepto,
+                       m.referencia_tipo, m.referencia_id, m.cuenta_destino_id,
+                       c.nombre AS cuenta_nombre,
+                       cd.nombre AS cuenta_destino_nombre
+                  FROM movimiento m
+                  JOIN cuenta c ON c.id = m.cuenta_id
+                  LEFT JOIN cuenta cd ON cd.id = m.cuenta_destino_id
+                 WHERE c.negocio_id = %s OR c.negocio_id IS NULL
+                 ORDER BY m.fecha DESC, m.id DESC
+            """
+            movs = fetch_all(query, [negocio_id])
+        return Response(movs)
+
+    def post(self, request, negocio_id):
+        cuenta_id = request.data.get("cuenta_id")
+        tipo = request.data.get("tipo")  # 'entrada', 'salida', 'transferencia'
+        monto = request.data.get("monto")
+        fecha = request.data.get("fecha")
+        concepto = request.data.get("concepto")
+        cuenta_destino_id = request.data.get("cuenta_destino_id")
+
+        if tipo == "transferencia" and not cuenta_destino_id:
+            return Response({"error": "Para transferencia hace falta la cuenta destino"}, status=400)
+
+        query = """
+            INSERT INTO movimiento (cuenta_id, tipo, monto, fecha, concepto, referencia_tipo, cuenta_destino_id)
+            OUTPUT INSERTED.id
+            VALUES (%s, %s, %s, %s, %s, 'manual', %s)
+        """
+        mov_id = execute_insert(query, [cuenta_id, tipo, monto, fecha, concepto, cuenta_destino_id])
+        return Response({"mensaje": "Movimiento registrado", "mov_id": mov_id})

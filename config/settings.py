@@ -63,7 +63,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
-        'NAME': 'MARUE',
+        'NAME': 'Marue',
         'HOST': 'localhost',
         'PORT': '',
         'OPTIONS': {
