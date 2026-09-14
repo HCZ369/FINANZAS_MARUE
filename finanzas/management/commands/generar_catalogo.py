@@ -102,6 +102,7 @@ class Command(BaseCommand):
               ) ventas_total ON ventas_total.producto_id = p.id
              WHERE p.negocio_id = %s
                AND p.estado = 'activo'
+               AND p.en_catalogo = 1
              ORDER BY p.nombre
         """
         registros = fetch_all(query, [negocio_id])

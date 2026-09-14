@@ -54,6 +54,7 @@ const FORMULARIO_INICIAL = {
   loteId: "",
   costoUsd: "",
   cantidadComprada: "",
+  enCatalogo: true,
 }
 
 function Catalogo({ negocioId }) {
@@ -301,6 +302,7 @@ function Catalogo({ negocioId }) {
       loteId: valorParaInput(producto.lote_id),
       costoUsd: valorParaInput(producto.costo_usd),
       cantidadComprada: valorParaInput(producto.cantidad_comprada),
+      enCatalogo: producto.en_catalogo !== 0 && producto.en_catalogo !== false,
     })
 
     setProductoAbiertoId(producto.id)
@@ -468,6 +470,7 @@ function Catalogo({ negocioId }) {
         formulario.cantidadComprada !== ""
           ? convertirNumero(formulario.cantidadComprada)
           : null,
+      en_catalogo: formulario.enCatalogo ? 1 : 0,
     }
 
     try {
@@ -1212,6 +1215,20 @@ function ModalFormularioProducto({
             </div>
           </div>
         )}
+
+        <div className="campo campo-checkbox">
+          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={formulario.enCatalogo}
+              onChange={(e) => onCambiar("enCatalogo", e.target.checked)}
+            />
+            <span>Mostrar en catálogo público</span>
+          </label>
+          <p style={{ fontSize: "0.75rem", color: "var(--texto-tenue)", marginTop: "0.3rem" }}>
+            Desmarcá esta opción si el producto es un insumo o no querés que aparezca en el catálogo.
+          </p>
+        </div>
 
         <div className="campo cat-campo-precio">
           <label htmlFor="producto-precio">Precio final</label>
