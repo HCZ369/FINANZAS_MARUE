@@ -8,6 +8,7 @@ function Layout({ negocioId, negocios, onCambioNegocio }) {
     { ruta: "/stock", texto: "Stock" },
     { ruta: "/clientes", texto: "Clientes" },
     { ruta: "/gastos", texto: "Gastos" },
+    { ruta: "/tesoreria", texto: "Tesorería" },
     { ruta: "/configuracion", texto: "Configuración" },
   ]
 

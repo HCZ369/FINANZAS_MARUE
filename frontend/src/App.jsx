@@ -9,6 +9,7 @@ import Configuracion from "./pages/Configuracion"
 import Clientes from "./pages/Clientes"
 import Stock from "./pages/Stock"
 import Catalogo from "./pages/Catalogo"
+import Tesoreria from "./pages/Tesoreria"
 
 function App() {
   const [negocios, setNegocios] = useState([])
@@ -42,6 +43,7 @@ function App() {
           <Route path="/catalogo" element={<Catalogo negocioId={negocioId} />} />
           <Route path="/clientes" element={<Clientes negocioId={negocioId} />} />
           <Route path="/stock" element={<Stock negocioId={negocioId} />} />
+          <Route path="/tesoreria" element={<Tesoreria negocioId={negocioId} />} />
         </Route>
       </Routes>
     </BrowserRouter>
