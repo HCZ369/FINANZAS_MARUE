@@ -418,13 +418,14 @@ class LotesView(APIView):
         tasa_cambio = request.data.get("tasa_cambio")
         descripcion = request.data.get("descripcion")
         plataforma = request.data.get("plataforma")
+        costo_retiro = request.data.get("costo_retiro", 0)
 
         query = """
-            INSERT INTO lote (negocio_id, fecha, tasa_cambio, descripcion, plataforma)
+            INSERT INTO lote (negocio_id, fecha, tasa_cambio, descripcion, plataforma, costo_retiro)
             OUTPUT INSERTED.id
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """
-        parametros = [negocio_id, fecha, tasa_cambio, descripcion, plataforma]
+        parametros = [negocio_id, fecha, tasa_cambio, descripcion, plataforma, costo_retiro]
         lote_id = execute_insert(query, parametros)
 
         return Response({"mensaje": "Lote creado", "lote_id": lote_id})
@@ -457,9 +458,11 @@ class LoteDetalleView(APIView):
         tasa_cambio = request.data.get("tasa_cambio")
         descripcion = request.data.get("descripcion")
         plataforma = request.data.get("plataforma")
+        costo_retiro = request.data.get("costo_retiro", 0)
 
-        query = "UPDATE lote SET fecha = %s, tasa_cambio = %s, descripcion = %s, plataforma = %s WHERE id = %s AND negocio_id = %s"
-        parametros = [fecha, tasa_cambio, descripcion, plataforma, lote_id, negocio_id]
+        query = """UPDATE lote SET fecha = %s, tasa_cambio = %s, descripcion = %s, plataforma = %s, costo_retiro = %s
+                   WHERE id = %s AND negocio_id = %s"""
+        parametros = [fecha, tasa_cambio, descripcion, plataforma, costo_retiro, lote_id, negocio_id]
 
         filas_afectadas = execute_command(query, parametros)
 
@@ -610,19 +613,25 @@ class InversionPorLoteView(APIView):
                    l.fecha,
                    l.descripcion,
                    l.tasa_cambio,
+                   COALESCE(l.costo_retiro, 0) AS costo_retiro,
                    COUNT(lp.id) AS productos_distintos,
                    COALESCE(SUM(lp.cantidad_comprada), 0) AS unidades,
-                   COALESCE(SUM(lp.costo * lp.cantidad_comprada), 0) AS inversion_gs,
-                   COALESCE(SUM(lp.costo_usd * lp.cantidad_comprada), 0) AS inversion_usd
+                   COALESCE(SUM(lp.costo * lp.cantidad_comprada), 0) AS inversion_productos_gs,
+                   COALESCE(SUM(lp.costo_usd * lp.cantidad_comprada), 0) AS inversion_usd,
+                   COALESCE(SUM(lp.costo * lp.cantidad_comprada), 0) + COALESCE(l.costo_retiro, 0) AS inversion_total_gs
               FROM lote l
               LEFT JOIN lote_producto lp ON lp.lote_id = l.id
              WHERE l.negocio_id = %s
-             GROUP BY l.id, l.fecha, l.descripcion, l.tasa_cambio
+             GROUP BY l.id, l.fecha, l.descripcion, l.tasa_cambio, l.costo_retiro
              ORDER BY l.fecha DESC
         """
         lotes = fetch_all(query_resumen, [negocio_id])
 
         for lote in lotes:
+            unidades = lote["unidades"] or 0
+            costo_retiro = float(lote["costo_retiro"] or 0)
+            retiro_por_unidad = (costo_retiro / unidades) if unidades > 0 else 0
+
             query_detalle = """
                 SELECT p.nombre AS producto,
                        lp.cantidad_comprada AS cantidad,
@@ -634,9 +643,19 @@ class InversionPorLoteView(APIView):
                  WHERE lp.lote_id = %s
                  ORDER BY p.nombre
             """
-            lote["productos"] = fetch_all(query_detalle, [lote["lote_id"]])
+            productos = fetch_all(query_detalle, [lote["lote_id"]])
+
+            # Agregar costo real por producto (costo + prorrateo del retiro)
+            for p in productos:
+                costo_gs = float(p["costo_gs"] or 0)
+                p["costo_real_unitario"] = costo_gs + retiro_por_unidad
+                p["subtotal_real_gs"] = p["costo_real_unitario"] * (p["cantidad"] or 0)
+
+            lote["productos"] = productos
+            lote["retiro_por_unidad"] = retiro_por_unidad
 
         return Response(lotes)
+    
 NUMERO_WHATSAPP = "595992188322"
 
 TEXTOS_NEGOCIO = {
