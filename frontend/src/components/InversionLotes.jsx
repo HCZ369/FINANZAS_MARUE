@@ -29,22 +29,19 @@ function InversionLotes({ negocioId }) {
     }
   }, [negocioId])
 
-  if (cargando) {
-    return <p className="inv-cargando">Cargando inversión...</p>
-  }
-
-  if (error) {
-    return <p className="inv-error">{error}</p>
-  }
-
-  if (lotes.length === 0) {
-    return <p className="inv-vacio">No hay lotes registrados.</p>
-  }
+  if (cargando) return <p className="inv-cargando">Cargando inversión...</p>
+  if (error) return <p className="inv-error">{error}</p>
+  if (lotes.length === 0) return <p className="inv-vacio">No hay lotes registrados.</p>
 
   return (
     <div className="inv-lista">
       {lotes.map((lote) => {
         const estaAbierto = abierto === lote.lote_id
+        const retiroPorUnidad = Number(lote.retiro_por_unidad || 0)
+        const costoRetiro = Number(lote.costo_retiro || 0)
+        const inversionProductos = Number(lote.inversion_productos_gs || 0)
+        const inversionTotal = Number(lote.inversion_total_gs || 0)
+
         return (
           <div key={lote.lote_id} className="inv-lote">
             <button
@@ -61,7 +58,7 @@ function InversionLotes({ negocioId }) {
 
               <div className="inv-lote-numeros">
                 <span className="inv-lote-inversion">
-                  {formatearMonto(lote.inversion_gs)}
+                  {formatearMonto(inversionTotal)}
                 </span>
                 <span className="inv-lote-detalle">
                   {lote.productos_distintos} productos · {lote.unidades} unidades
@@ -71,14 +68,41 @@ function InversionLotes({ negocioId }) {
 
             {estaAbierto && (
               <div className="inv-lote-tabla">
+                <div className="inv-lote-desglose">
+                  <div>
+                    <span className="inv-desglose-label">Compra</span>
+                    <span className="inv-desglose-valor">
+                      {formatearMonto(inversionProductos)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="inv-desglose-label">Retiro</span>
+                    <span className="inv-desglose-valor">
+                      {formatearMonto(costoRetiro)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="inv-desglose-label">Prorrateo por unidad</span>
+                    <span className="inv-desglose-valor">
+                      {formatearMonto(retiroPorUnidad)}
+                    </span>
+                  </div>
+                  <div className="inv-desglose-total">
+                    <span className="inv-desglose-label">Inversión total</span>
+                    <span className="inv-desglose-valor">
+                      {formatearMonto(inversionTotal)}
+                    </span>
+                  </div>
+                </div>
+
                 <table>
                   <thead>
                     <tr>
                       <th>Producto</th>
                       <th>Cant.</th>
-                      <th>Costo USD</th>
-                      <th>Costo Gs</th>
-                      <th>Subtotal</th>
+                      <th>Costo compra</th>
+                      <th>Costo real</th>
+                      <th>Subtotal real</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -86,9 +110,11 @@ function InversionLotes({ negocioId }) {
                       <tr key={i}>
                         <td>{p.producto}</td>
                         <td>{p.cantidad}</td>
-                        <td>{p.costo_usd != null ? `USD ${p.costo_usd}` : "-"}</td>
                         <td>{formatearMonto(p.costo_gs)}</td>
-                        <td>{formatearMonto(p.subtotal_gs)}</td>
+                        <td style={{ color: "var(--acento-claro, #c18496)" }}>
+                          {formatearMonto(p.costo_real_unitario)}
+                        </td>
+                        <td>{formatearMonto(p.subtotal_real_gs)}</td>
                       </tr>
                     ))}
                   </tbody>
