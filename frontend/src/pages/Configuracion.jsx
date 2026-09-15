@@ -6,7 +6,7 @@ const FORM_INICIAL = {
   negocio: { nombre: "" },
   categoria: { nombre: "", tipo: "gasto" },
   inyeccion: { monto: "", fecha: "", nota: "" },
-  lote: { fecha: "", tasa_cambio: "", descripcion: "" },
+  lote: { fecha: "", tasa_cambio: "", descripcion: "", costo_retiro: "" },
   producto: {
     nombre: "",
     precio: "",
@@ -254,12 +254,13 @@ function Configuracion({ negocioId }) {
   }
 
   function editarLote(l) {
-    actualizarForm("lote", {
-      fecha: l.fecha,
-      tasa_cambio: l.tasa_cambio,
-      descripcion: l.descripcion || "",
-    })
-    setEditandoId((p) => ({ ...p, lote: l.id }))
+  actualizarForm("lote", {
+    fecha: l.fecha,
+    tasa_cambio: l.tasa_cambio,
+    descripcion: l.descripcion || "",
+    costo_retiro: l.costo_retiro || "",
+  })
+  setEditandoId((p) => ({ ...p, lote: l.id }))
   }
 
   function borrarLote(l) {
@@ -601,14 +602,25 @@ function Configuracion({ negocioId }) {
               />
             </div>
           </div>
-          <div className="campo">
-            <label>Descripción (opcional)</label>
-            <input
-              type="text"
-              placeholder="Ej: Lote AliExpress mayo"
-              value={formL.descripcion}
-              onChange={(e) => actualizarForm("lote", { descripcion: e.target.value })}
-            />
+          <div className="grid-form-config">
+            <div className="campo">
+              <label>Descripción (opcional)</label>
+              <input
+                type="text"
+                placeholder="Ej: Lote AliExpress mayo"
+                value={formL.descripcion}
+                onChange={(e) => actualizarForm("lote", { descripcion: e.target.value })}
+              />
+            </div>
+            <div className="campo">
+              <label>Costo de retiro (Gs)</label>
+              <input
+                type="number"
+                placeholder=""
+                value={formL.costo_retiro}
+                onChange={(e) => actualizarForm("lote", { costo_retiro: e.target.value })}
+              />
+            </div>
           </div>
           <div className="fila-form">
             <button
@@ -636,6 +648,9 @@ function Configuracion({ negocioId }) {
             <div className="fila-item" key={l.id}>
               <span>
                 {l.fecha} — Tasa <strong>{formatearMonto(l.tasa_cambio)}</strong>
+                {Number(l.costo_retiro) > 0 && (
+                  <> · Retiro <strong>{formatearMonto(l.costo_retiro)}</strong></>
+                )}
                 {l.descripcion ? ` (${l.descripcion})` : ""}
               </span>
               <div className="acciones">
