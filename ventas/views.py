@@ -690,8 +690,10 @@ class GenerarCatalogoView(APIView):
         query = """
             SELECT p.id, p.nombre, p.precio, p.imagen_url,
                    p.material, p.talla, p.descripcion,
+                   c.nombre AS categoria_nombre,
                    COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock
               FROM producto p
+              LEFT JOIN categoria c ON c.id = p.categoria_id
               LEFT JOIN (SELECT producto_id, SUM(cantidad_comprada) AS total FROM lote_producto GROUP BY producto_id) compras ON compras.producto_id = p.id
               LEFT JOIN (SELECT producto_id, SUM(cantidad) AS total FROM venta_detalle GROUP BY producto_id) ventas_total ON ventas_total.producto_id = p.id
              WHERE p.negocio_id = %s
@@ -714,6 +716,7 @@ class GenerarCatalogoView(APIView):
                 "talla": p.get("talla") or "",
                 "descripcion": p.get("descripcion") or "",
                 "foto": self.optimizar_cloudinary(p.get("imagen_url") or ""),
+                "categoria": p.get("categoria_nombre") or "Otros",
             })
 
         productos_json = json.dumps(productos_publicos, ensure_ascii=False)
@@ -739,8 +742,10 @@ class GenerarCatalogoView(APIView):
             return url
         if "f_auto" in url:
             return url
-        return url.replace("/upload/", "/upload/f_auto,q_auto/")
-# Pegar esta línea al FINAL de ventas/views.py, después de todas las clases:
+        return url.replace("/upload/", "/upload/f_auto,q_auto,w_800,h_800,c_pad,b_auto/")
+
+# Reemplazá la variable PLANTILLA_HTML en ventas/views.py por esta.
+# Los cambios: agrega botones de filtro por categoría arriba de la grilla.
 
 PLANTILLA_HTML = r"""<!DOCTYPE html>
 <html lang="es">
@@ -795,6 +800,39 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     }}
     .buscador input::placeholder {{ color: var(--ceniza); letter-spacing: 0.06em; }}
     .buscador input:focus {{ border-color: var(--vino-1); box-shadow: 0 0 0 1px var(--vino) inset; }}
+
+    .filtros {{
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.4rem;
+      margin-bottom: 1.6rem;
+      padding: 0 0.5rem;
+    }}
+    .filtro-btn {{
+      background: transparent;
+      border: 1px solid var(--borde);
+      color: var(--hueso-tenue);
+      padding: 0.42rem 0.85rem;
+      font-family: "Jost", sans-serif;
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: all 160ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }}
+    .filtro-btn:hover {{
+      border-color: var(--vino-1);
+      color: var(--hueso);
+    }}
+    .filtro-btn.activo {{
+      background: var(--vino);
+      border-color: var(--vino);
+      color: var(--hueso);
+    }}
+
     .contador {{
       text-align: center; color: var(--ceniza); font-size: 0.72rem;
       letter-spacing: 0.22em; text-transform: uppercase; margin-bottom: 2.2rem;
@@ -883,6 +921,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     <div class="buscador">
       <input type="text" id="buscar" placeholder="Buscar pieza o material" autocomplete="off">
     </div>
+    <div class="filtros" id="filtros"></div>
     <div class="contador" id="contador"></div>
     <div class="grilla" id="grilla"></div>
     <div class="vacio" id="vacio" style="display:none;">No se encontraron piezas.</div>
@@ -895,6 +934,9 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     var vacio = document.getElementById("vacio");
     var contador = document.getElementById("contador");
     var inputBuscar = document.getElementById("buscar");
+    var filtrosEl = document.getElementById("filtros");
+
+    var categoriaActiva = "Todos";
 
     function escapar(t) {{
       var d = document.createElement("div");
@@ -910,7 +952,6 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
       '<path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 20zm4.4-6c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.7.9-.3.2-.5.1a6.5 6.5 0 0 1-3.2-2.8c-.2-.4.2-.4.6-1.2.1-.2 0-.3 0-.4l-.7-1.7c-.2-.5-.4-.4-.5-.4h-.5a1 1 0 0 0-.7.3A2.9 2.9 0 0 0 6.4 10a5 5 0 0 0 1.1 2.7 11.5 11.5 0 0 0 4.4 3.9c2 .8 2 .6 2.4.5a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .1-1.2c-.1-.1-.2-.2-.4-.3z"/>' +
       '</svg>';
-
     function tarjeta(p) {{
       var card = document.createElement("button");
       card.className = "card"; card.type = "button";
@@ -938,6 +979,46 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     function normalizar(t) {{
       return (t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     }}
+
+    function construirFiltros() {{
+      // Categorías presentes en los productos, en el orden preferido
+      var ORDEN = ["Aros", "Anillos", "Collares", "Pulseras", "Dijes", "Cadenas", "Otros"];
+      var presentes = {{}};
+      PRODUCTOS.forEach(function (p) {{ presentes[p.categoria || "Otros"] = true; }});
+
+      var lista = ["Todos"];
+      ORDEN.forEach(function (c) {{ if (presentes[c]) lista.push(c); }});
+      // Categorías que no estén en el orden preferido (por si aparecen otras)
+      Object.keys(presentes).forEach(function (c) {{
+        if (lista.indexOf(c) === -1) lista.push(c);
+      }});
+
+      filtrosEl.innerHTML = "";
+      lista.forEach(function (cat) {{
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "filtro-btn" + (cat === categoriaActiva ? " activo" : "");
+        btn.textContent = cat;
+        btn.addEventListener("click", function () {{
+          categoriaActiva = cat;
+          construirFiltros();
+          aplicarFiltros();
+        }});
+        filtrosEl.appendChild(btn);
+      }});
+    }}
+
+    function aplicarFiltros() {{
+      var q = normalizar(inputBuscar.value);
+      var filtrados = PRODUCTOS.filter(function (p) {{
+        var coincideCat = categoriaActiva === "Todos" || (p.categoria || "Otros") === categoriaActiva;
+        if (!coincideCat) return false;
+        if (!q) return true;
+        return normalizar(p.nombre).indexOf(q) !== -1 || normalizar(p.material).indexOf(q) !== -1;
+      }});
+      render(filtrados);
+    }}
+
     function render(lista) {{
       grilla.innerHTML = "";
       if (lista.length === 0) {{
@@ -949,15 +1030,11 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       lista.forEach(function (p) {{ frag.appendChild(tarjeta(p)); }});
       grilla.appendChild(frag);
     }}
-    inputBuscar.addEventListener("input", function (e) {{
-      var q = normalizar(e.target.value);
-      if (!q) {{ render(PRODUCTOS); return; }}
-      var filtrados = PRODUCTOS.filter(function (p) {{
-        return normalizar(p.nombre).indexOf(q) !== -1 || normalizar(p.material).indexOf(q) !== -1;
-      }});
-      render(filtrados);
-    }});
-    render(PRODUCTOS);
+
+    inputBuscar.addEventListener("input", aplicarFiltros);
+
+    construirFiltros();
+    aplicarFiltros();
   </script>
 </body>
 </html>
