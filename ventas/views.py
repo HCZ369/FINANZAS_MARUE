@@ -186,7 +186,6 @@ class ProductoDetalleView(APIView):
 
         return Response({"mensaje": "Producto eliminado"})
 
-
 class VentasView(APIView):
     def get(self, request, negocio_id):
         query = "SELECT * FROM venta WHERE negocio_id = %s"
@@ -283,7 +282,6 @@ class VentasView(APIView):
                 aviso = {"producto": resultado["nombre"], "stock": resultado["stock"]}
                 avisos.append(aviso)
         return avisos
-
 
 class VentaDetalleView(APIView):
     def get(self, request, negocio_id, venta_id):
@@ -399,13 +397,11 @@ class VentaDetalleView(APIView):
 
         return Response({"mensaje": "Venta eliminada"})
 
-
 class VentasPorClienteView(APIView):
     def get(self, request, negocio_id, cliente_id):
         query = "SELECT id, fecha, monto_total FROM venta WHERE negocio_id = %s AND cliente_id = %s ORDER BY fecha DESC"
         registros = fetch_all(query, [negocio_id, cliente_id])
         return Response(registros)
-
 
 class LotesView(APIView):
     def get(self, request, negocio_id):
@@ -429,7 +425,6 @@ class LotesView(APIView):
         lote_id = execute_insert(query, parametros)
 
         return Response({"mensaje": "Lote creado", "lote_id": lote_id})
-
 
 class LoteDetalleView(APIView):
     def get(self, request, negocio_id, lote_id):
@@ -480,7 +475,6 @@ class LoteDetalleView(APIView):
 
         return Response({"mensaje": "Lote eliminado"})
 
-
 class LoteProductoView(APIView):
     def post(self, request, negocio_id, lote_id):
         producto_id = request.data.get("producto_id")
@@ -505,7 +499,6 @@ class LoteProductoView(APIView):
         lote_producto_id = execute_insert(query, parametros)
 
         return Response({"mensaje": "Producto agregado al lote", "lote_producto_id": lote_producto_id})
-
 
 class LoteProductoDetalleView(APIView):
     def put(self, request, negocio_id, lote_id, lote_producto_id):
@@ -539,7 +532,6 @@ class LoteProductoDetalleView(APIView):
             return Response({"error": "Producto del lote no encontrado"}, status=404)
 
         return Response({"mensaje": "Producto del lote eliminado"})
-
 
 class SugerenciaPrecioView(APIView):
     def post(self, request, negocio_id):
@@ -579,7 +571,6 @@ class SugerenciaPrecioView(APIView):
             "precio_sugerido": precio_sugerido,
         }
         return Response(respuesta)
-
 
 class StockView(APIView):
     def get(self, request, negocio_id):
@@ -744,9 +735,6 @@ class GenerarCatalogoView(APIView):
             return url
         return url.replace("/upload/", "/upload/f_auto,q_auto,w_800,h_800,c_pad,b_auto/")
 
-# Reemplazá la variable PLANTILLA_HTML en ventas/views.py por esta.
-# Los cambios: agrega botones de filtro por categoría arriba de la grilla.
-
 PLANTILLA_HTML = r"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -764,6 +752,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       --borde: #241d24; --borde-luz: #3a2d38;
       --hueso: #e7e0e4; --hueso-tenue: #a99ea6; --ceniza: #6f6570;
       --vino: #7c3a4e; --vino-1: #8a3a50; --vino-2: #b06074;
+      --wa-verde: #25d366;
     }}
     html {{ background: var(--negro); scrollbar-color: #2a2029 var(--negro); }}
     body {{
@@ -771,6 +760,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       background: radial-gradient(ellipse at 50% -10%, #16101580 0%, transparent 60%), var(--negro);
       color: var(--hueso); -webkit-font-smoothing: antialiased; min-height: 100vh;
     }}
+    body.modal-abierto {{ overflow: hidden; }}
     ::-webkit-scrollbar {{ width: 9px; }}
     ::-webkit-scrollbar-track {{ background: var(--negro); }}
     ::-webkit-scrollbar-thumb {{ background: #2a2029; border: 2px solid var(--negro); }}
@@ -800,39 +790,21 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     }}
     .buscador input::placeholder {{ color: var(--ceniza); letter-spacing: 0.06em; }}
     .buscador input:focus {{ border-color: var(--vino-1); box-shadow: 0 0 0 1px var(--vino) inset; }}
-
     .filtros {{
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.4rem;
-      margin-bottom: 1.6rem;
-      padding: 0 0.5rem;
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 0.4rem; margin-bottom: 1.6rem; padding: 0 0.5rem;
     }}
     .filtro-btn {{
-      background: transparent;
-      border: 1px solid var(--borde);
-      color: var(--hueso-tenue);
-      padding: 0.42rem 0.85rem;
-      font-family: "Jost", sans-serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      cursor: pointer;
-      border-radius: 2px;
+      background: transparent; border: 1px solid var(--borde);
+      color: var(--hueso-tenue); padding: 0.42rem 0.85rem;
+      font-family: "Jost", sans-serif; font-size: 0.72rem;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      cursor: pointer; border-radius: 2px;
       transition: all 160ms ease;
       -webkit-tap-highlight-color: transparent;
     }}
-    .filtro-btn:hover {{
-      border-color: var(--vino-1);
-      color: var(--hueso);
-    }}
-    .filtro-btn.activo {{
-      background: var(--vino);
-      border-color: var(--vino);
-      color: var(--hueso);
-    }}
-
+    .filtro-btn:hover {{ border-color: var(--vino-1); color: var(--hueso); }}
+    .filtro-btn.activo {{ background: var(--vino); border-color: var(--vino); color: var(--hueso); }}
     .contador {{
       text-align: center; color: var(--ceniza); font-size: 0.72rem;
       letter-spacing: 0.22em; text-transform: uppercase; margin-bottom: 2.2rem;
@@ -895,13 +867,11 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       font-family: "Cinzel", serif; font-weight: 500; font-size: 0.92rem;
       color: var(--vino-2); letter-spacing: 0.03em; white-space: nowrap;
     }}
-    .consultar {{
+    .toque-detalle {{
       font-size: 0.62rem; letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--hueso-tenue); display: flex; align-items: center; gap: 0.3rem;
-      transition: color 200ms ease;
+      color: var(--hueso-tenue);
     }}
-    .card:hover .consultar, .card:active .consultar {{ color: var(--vino-2); }}
-    .consultar svg {{ width: 12px; height: 12px; display: block; }}
+    .card:hover .toque-detalle, .card:active .toque-detalle {{ color: var(--vino-2); }}
     .vacio {{
       text-align: center; color: var(--ceniza); font-family: "Cormorant Garamond", serif;
       font-style: italic; font-size: 1.1rem; padding: 3.5rem 1rem;
@@ -909,6 +879,104 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     .footer {{
       text-align: center; color: #4d454d; font-size: 0.64rem;
       letter-spacing: 0.2em; text-transform: uppercase; margin-top: 3.5rem;
+    }}
+
+    /* MODAL DETALLE */
+    .modal-fondo {{
+      position: fixed; inset: 0; background: rgba(6, 5, 6, 0.92);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 1rem;
+      opacity: 0; visibility: hidden;
+      transition: opacity 220ms ease, visibility 220ms ease;
+    }}
+    .modal-fondo.abierto {{ opacity: 1; visibility: visible; }}
+    .modal-caja {{
+      position: relative; max-width: 480px; width: 100%;
+      max-height: 92vh; overflow-y: auto;
+      background: linear-gradient(180deg, var(--panel) 0%, var(--negro-2) 100%);
+      border: 1px solid var(--borde-luz); border-radius: 3px;
+      transform: scale(0.96);
+      transition: transform 220ms ease;
+    }}
+    .modal-fondo.abierto .modal-caja {{ transform: scale(1); }}
+    .modal-cerrar {{
+      position: absolute; top: 0.8rem; right: 0.8rem;
+      width: 36px; height: 36px;
+      background: rgba(6, 5, 6, 0.6);
+      border: 1px solid var(--borde);
+      color: var(--hueso); font-size: 1.4rem; line-height: 1;
+      cursor: pointer; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2;
+      -webkit-tap-highlight-color: transparent;
+      transition: all 180ms ease;
+    }}
+    .modal-cerrar:hover {{ background: var(--vino); border-color: var(--vino); }}
+    .modal-foto {{
+      width: 100%; aspect-ratio: 1 / 1;
+      background: var(--negro-2); overflow: hidden;
+    }}
+    .modal-foto img {{
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }}
+    .modal-foto-vacia {{
+      width: 100%; aspect-ratio: 1 / 1;
+      background: repeating-linear-gradient(45deg, #0d0a0d 0 10px, #0a080a 10px 20px);
+      display: flex; align-items: center; justify-content: center; color: var(--ceniza);
+      font-family: "Cinzel", serif; font-size: 3rem; letter-spacing: 0.1em;
+    }}
+    .modal-info {{ padding: 1.4rem 1.3rem 1.6rem; }}
+    .modal-nombre {{
+      font-family: "Cormorant Garamond", serif; font-weight: 500;
+      font-size: 1.55rem; line-height: 1.15; color: var(--hueso);
+      margin-bottom: 0.4rem;
+    }}
+    .modal-precio {{
+      font-family: "Cinzel", serif; font-weight: 500;
+      font-size: 1.35rem; color: var(--vino-2);
+      letter-spacing: 0.03em; margin-bottom: 1rem;
+    }}
+    .modal-detalles {{
+      display: flex; flex-direction: column; gap: 0.55rem;
+      margin-bottom: 1.2rem;
+      padding-top: 1rem; border-top: 1px solid var(--borde);
+    }}
+    .modal-detalle-item {{
+      display: flex; gap: 0.6rem; font-size: 0.85rem;
+    }}
+    .modal-detalle-item b {{
+      color: var(--hueso-tenue); font-weight: 400;
+      min-width: 90px; text-transform: uppercase;
+      font-size: 0.68rem; letter-spacing: 0.14em; padding-top: 0.15rem;
+    }}
+    .modal-detalle-item span {{ color: var(--hueso); }}
+    .modal-descripcion {{
+      color: var(--hueso-tenue); font-size: 0.92rem;
+      line-height: 1.5; margin-bottom: 1.4rem;
+      padding-top: 1rem; border-top: 1px solid var(--borde);
+    }}
+    .modal-btn-wa {{
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.6rem; width: 100%;
+      background: var(--wa-verde); color: #fff;
+      border: none; border-radius: 3px;
+      padding: 1rem 1.2rem;
+      font-family: "Jost", sans-serif; font-weight: 500;
+      font-size: 1rem; letter-spacing: 0.06em;
+      cursor: pointer; text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }}
+    .modal-btn-wa:hover {{
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px -8px rgba(37, 211, 102, 0.5);
+    }}
+    .modal-btn-wa svg {{ width: 22px; height: 22px; }}
+
+    @media (min-width: 620px) {{
+      .modal-info {{ padding: 1.8rem 1.7rem 2rem; }}
+      .modal-nombre {{ font-size: 1.75rem; }}
     }}
   </style>
 </head>
@@ -925,8 +993,17 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     <div class="contador" id="contador"></div>
     <div class="grilla" id="grilla"></div>
     <div class="vacio" id="vacio" style="display:none;">No se encontraron piezas.</div>
-    <footer class="footer">Precios en guaraníes &middot; Consultas por WhatsApp</footer>
+    <footer class="footer">Tienda 100% online. Realizamos delivery y envíos a todo el país. No contamos con local físico.</footer>
   </div>
+
+  <!-- MODAL DE DETALLE -->
+  <div class="modal-fondo" id="modal" role="dialog" aria-modal="true">
+    <div class="modal-caja">
+      <button class="modal-cerrar" id="modalCerrar" aria-label="Cerrar">&times;</button>
+      <div id="modalContenido"></div>
+    </div>
+  </div>
+
   <script>
     var PRODUCTOS = {productos_json};
     var WHATSAPP = "{numero_whatsapp}";
@@ -935,6 +1012,9 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     var contador = document.getElementById("contador");
     var inputBuscar = document.getElementById("buscar");
     var filtrosEl = document.getElementById("filtros");
+    var modal = document.getElementById("modal");
+    var modalContenido = document.getElementById("modalContenido");
+    var modalCerrar = document.getElementById("modalCerrar");
 
     var categoriaActiva = "Todos";
 
@@ -943,15 +1023,67 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       d.textContent = t == null ? "" : String(t);
       return d.innerHTML;
     }}
-    function consultar(p) {{
+
+    function urlWhatsApp(p) {{
       var texto = "Hola! Me interesa esta pieza: " + p.nombre + " (" + p.precio + ")";
-      var url = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(texto);
-      window.open(url, "_blank");
+      return "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(texto);
     }}
+
     var ICONO_WA =
       '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
       '<path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 20zm4.4-6c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.7.9-.3.2-.5.1a6.5 6.5 0 0 1-3.2-2.8c-.2-.4.2-.4.6-1.2.1-.2 0-.3 0-.4l-.7-1.7c-.2-.5-.4-.4-.5-.4h-.5a1 1 0 0 0-.7.3A2.9 2.9 0 0 0 6.4 10a5 5 0 0 0 1.1 2.7 11.5 11.5 0 0 0 4.4 3.9c2 .8 2 .6 2.4.5a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .1-1.2c-.1-.1-.2-.2-.4-.3z"/>' +
       '</svg>';
+
+    function abrirModal(p) {{
+      var foto = p.foto
+        ? '<div class="modal-foto"><img src="' + escapar(p.foto) + '" alt="' + escapar(p.nombre) + '" onerror="this.parentNode.outerHTML=\'<div class=modal-foto-vacia>M</div>\'"></div>'
+        : '<div class="modal-foto-vacia">M</div>';
+
+      var detalles = "";
+      if (p.material) {{
+        detalles += '<div class="modal-detalle-item"><b>Material</b><span>' + escapar(p.material) + '</span></div>';
+      }}
+      if (p.talla) {{
+        detalles += '<div class="modal-detalle-item"><b>Talla</b><span>' + escapar(p.talla) + '</span></div>';
+      }}
+      if (p.categoria) {{
+        detalles += '<div class="modal-detalle-item"><b>Categoría</b><span>' + escapar(p.categoria) + '</span></div>';
+      }}
+
+      var descripcion = p.descripcion
+        ? '<p class="modal-descripcion">' + escapar(p.descripcion) + '</p>'
+        : '';
+
+      modalContenido.innerHTML =
+        foto +
+        '<div class="modal-info">' +
+          '<h2 class="modal-nombre">' + escapar(p.nombre) + '</h2>' +
+          '<div class="modal-precio">' + escapar(p.precio) + '</div>' +
+          (detalles ? '<div class="modal-detalles">' + detalles + '</div>' : '') +
+          descripcion +
+          '<a href="' + urlWhatsApp(p) + '" target="_blank" rel="noopener" class="modal-btn-wa">' +
+            ICONO_WA + '<span>Consultar por WhatsApp</span>' +
+          '</a>' +
+        '</div>';
+
+      modal.classList.add("abierto");
+      document.body.classList.add("modal-abierto");
+    }}
+
+    function cerrarModal() {{
+      modal.classList.remove("abierto");
+      document.body.classList.remove("modal-abierto");
+      setTimeout(function () {{ modalContenido.innerHTML = ""; }}, 240);
+    }}
+
+    modalCerrar.addEventListener("click", cerrarModal);
+    modal.addEventListener("click", function (e) {{
+      if (e.target === modal) cerrarModal();
+    }});
+    document.addEventListener("keydown", function (e) {{
+      if (e.key === "Escape") cerrarModal();
+    }});
+
     function tarjeta(p) {{
       var card = document.createElement("button");
       card.className = "card"; card.type = "button";
@@ -970,29 +1102,26 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
           (p.descripcion ? '<div class="desc">' + escapar(p.descripcion) + '</div>' : '') +
           '<div class="pie">' +
             '<span class="precio">' + escapar(p.precio) + '</span>' +
-            '<span class="consultar">' + ICONO_WA + 'Consultar</span>' +
+            '<span class="toque-detalle">Ver detalle</span>' +
           '</div>' +
         '</div>';
-      card.addEventListener("click", function () {{ consultar(p); }});
+      card.addEventListener("click", function () {{ abrirModal(p); }});
       return card;
     }}
+
     function normalizar(t) {{
       return (t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     }}
 
     function construirFiltros() {{
-      // Categorías presentes en los productos, en el orden preferido
-      var ORDEN = ["Aros", "Anillos", "Collares", "Pulseras", "Dijes", "Cadenas", "Otros"];
+      var ORDEN = ["Anillos", "Aros", "Cadenas", "Chokers", "Collares", "Conjuntos", "Dijes", "Llaveros", "Muñequeras", "Pendientes", "Pines", "Pulseras", "Soportes", "Otros"];
       var presentes = {{}};
       PRODUCTOS.forEach(function (p) {{ presentes[p.categoria || "Otros"] = true; }});
-
       var lista = ["Todos"];
       ORDEN.forEach(function (c) {{ if (presentes[c]) lista.push(c); }});
-      // Categorías que no estén en el orden preferido (por si aparecen otras)
       Object.keys(presentes).forEach(function (c) {{
         if (lista.indexOf(c) === -1) lista.push(c);
       }});
-
       filtrosEl.innerHTML = "";
       lista.forEach(function (cat) {{
         var btn = document.createElement("button");
@@ -1032,7 +1161,6 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     }}
 
     inputBuscar.addEventListener("input", aplicarFiltros);
-
     construirFiltros();
     aplicarFiltros();
   </script>
@@ -1070,7 +1198,6 @@ class CuentasView(APIView):
         """
         cuenta_id = execute_insert(query, [negocio_id, nombre, tipo, saldo_inicial])
         return Response({"mensaje": "Cuenta creada", "cuenta_id": cuenta_id})
-
 
 class MovimientosView(APIView):
     def get(self, request, negocio_id):
