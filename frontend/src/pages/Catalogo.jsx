@@ -342,6 +342,41 @@ function Catalogo({ negocioId }) {
     }
   }
 
+  // --- NUEVO: agregar producto a un lote nuevo ---
+  async function agregarALote(productoId, loteId, costoUsd, cantidadComprada) {
+    try {
+      setGuardandoLote("nuevo")
+
+      await apiPost(
+        `/negocios/${negocioId}/lotes/${loteId}/productos/`,
+        {
+          producto_id: productoId,
+          costo_usd: costoUsd !== "" ? convertirNumero(costoUsd) : null,
+          cantidad_comprada: convertirNumero(cantidadComprada),
+          precio_sugerido: null,
+        }
+      )
+
+      mostrarMensaje("Producto agregado al lote correctamente.")
+      await cargarDatos()
+
+      const detalle = await apiGet(
+        `/negocios/${negocioId}/productos/${productoId}/`
+      )
+
+      if (Array.isArray(detalle.lotes)) {
+        setLotesProducto(detalle.lotes)
+      }
+    } catch (error) {
+      mostrarMensaje(
+        error?.message || "No se pudo agregar el producto al lote.",
+        "error"
+      )
+    } finally {
+      setGuardandoLote(null)
+    }
+  }
+
   function abrirCreacion() {
     setProductoAbiertoId(null)
     setFormulario(FORMULARIO_INICIAL)
@@ -882,11 +917,13 @@ function Catalogo({ negocioId }) {
         <ModalProducto
           producto={productoAbierto}
           lotesProducto={lotesProducto}
+          lotesDisponibles={lotes}
           guardandoLote={guardandoLote}
           onCerrar={cerrarModal}
           onEditar={() => abrirEdicion(productoAbierto)}
           onEliminar={() => borrarProducto(productoAbierto)}
           onGuardarCantidad={guardarCantidadLote}
+          onAgregarALote={agregarALote}
           eliminando={eliminando}
         />
       )}
@@ -1009,15 +1046,19 @@ function TarjetaProducto({ producto, seleccionado, onAbrir, onSeleccionar }) {
 function ModalProducto({
   producto,
   lotesProducto,
+  lotesDisponibles,
   guardandoLote,
   onCerrar,
   onEditar,
   onEliminar,
   onGuardarCantidad,
+  onAgregarALote,
   eliminando,
 }) {
   const estado = obtenerEstadoStock(producto.stock)
   const [cantidadesEditadas, setCantidadesEditadas] = useState({})
+  const [mostrandoFormLote, setMostrandoFormLote] = useState(false)
+  const [nuevoLote, setNuevoLote] = useState({ loteId: "", costoUsd: "", cantidad: "" })
 
   function cambiarCantidad(loteProductoId, valor) {
     setCantidadesEditadas((anterior) => ({
@@ -1193,6 +1234,111 @@ function ModalProducto({
           ))}
         </div>
       )}
+
+      <div className="cat-detalle-lotes" style={{ borderTop: "1px solid var(--borde, #241d24)" }}>
+        {!mostrandoFormLote ? (
+          <button
+            type="button"
+            className="btn-secundario"
+            style={{ width: "100%" }}
+            onClick={() => setMostrandoFormLote(true)}
+          >
+            Agregar a otro lote
+          </button>
+        ) : (
+          <div className="cat-form-nuevo-lote">
+            <h4 className="cat-lotes-titulo">Agregar a lote</h4>
+
+            <div className="campo" style={{ marginBottom: "0.5rem" }}>
+              <label htmlFor="nuevo-lote-select">Lote</label>
+              <select
+                id="nuevo-lote-select"
+                value={nuevoLote.loteId}
+                onChange={(e) =>
+                  setNuevoLote((prev) => ({ ...prev, loteId: e.target.value }))
+                }
+              >
+                <option value="">Seleccionar lote</option>
+                {lotesDisponibles.map((lote) => (
+                  <option key={lote.id} value={lote.id}>
+                    {lote.descripcion || "Lote " + lote.id} — {lote.fecha}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+              <div className="campo" style={{ flex: 1 }}>
+                <label htmlFor="nuevo-lote-costo">Costo USD</label>
+                <input
+                  id="nuevo-lote-costo"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="0.00"
+                  value={nuevoLote.costoUsd}
+                  onChange={(e) =>
+                    setNuevoLote((prev) => ({ ...prev, costoUsd: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="campo" style={{ flex: 1 }}>
+                <label htmlFor="nuevo-lote-cantidad">Cantidad</label>
+                <input
+                  id="nuevo-lote-cantidad"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="0"
+                  value={nuevoLote.cantidad}
+                  onChange={(e) =>
+                    setNuevoLote((prev) => ({ ...prev, cantidad: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button
+                type="button"
+                className="btn-secundario"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  setMostrandoFormLote(false)
+                  setNuevoLote({ loteId: "", costoUsd: "", cantidad: "" })
+                }}
+                disabled={guardandoLote === "nuevo"}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                className="btn-principal"
+                style={{ flex: 1 }}
+                disabled={
+                  !nuevoLote.loteId ||
+                  convertirNumero(nuevoLote.cantidad) <= 0 ||
+                  guardandoLote === "nuevo"
+                }
+                onClick={async () => {
+                  await onAgregarALote(
+                    producto.id,
+                    Number(nuevoLote.loteId),
+                    nuevoLote.costoUsd,
+                    nuevoLote.cantidad
+                  )
+                  setMostrandoFormLote(false)
+                  setNuevoLote({ loteId: "", costoUsd: "", cantidad: "" })
+                }}
+              >
+                {guardandoLote === "nuevo" ? "Guardando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="cat-detalle-acciones">
         <button type="button" className="btn-principal" onClick={onEditar}>
