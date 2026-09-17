@@ -4303,3 +4303,84 @@ a:focus-visible {
     padding: 1rem 0.85rem 1.15rem;
   }
 }
+/* --- Lotes en detalle de producto --- */
+.cat-detalle-lotes {
+  padding: 0.8rem 1rem;
+  border-top: 1px solid var(--borde, #241d24);
+}
+
+.cat-lotes-titulo {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--texto-tenue, #a99ea6);
+  margin-bottom: 0.6rem;
+}
+
+.cat-lote-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 0.8rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--borde, #241d24);
+}
+
+.cat-lote-fila:last-child {
+  border-bottom: none;
+}
+
+.cat-lote-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.cat-lote-nombre {
+  font-size: 0.85rem;
+  color: var(--texto-claro, #e7e0e4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cat-lote-fecha {
+  font-size: 0.72rem;
+  color: var(--texto-tenue, #a99ea6);
+}
+
+.cat-lote-cantidad {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.cat-lote-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--texto-tenue, #a99ea6);
+}
+
+.cat-lote-input-grupo {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.cat-lote-input {
+  width: 70px;
+  padding: 0.35rem 0.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cat-lote-btn-guardar {
+  padding: 0.35rem 0.65rem !important;
+  font-size: 0.75rem !important;
+  white-space: nowrap;
+}

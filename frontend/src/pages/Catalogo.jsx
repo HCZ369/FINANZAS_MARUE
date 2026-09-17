@@ -84,6 +84,10 @@ function Catalogo({ negocioId }) {
   const [calculandoSugerencia, setCalculandoSugerencia] = useState(false)
   const [generandoCatalogo, setGenerandoCatalogo] = useState(false)
 
+  // --- NUEVO: estado para lotes del producto abierto ---
+  const [lotesProducto, setLotesProducto] = useState([])
+  const [guardandoLote, setGuardandoLote] = useState(null)
+
   const mostrarMensaje = useCallback((texto, tipo = "exito") => {
     if (temporizadorMensaje.current) {
       window.clearTimeout(temporizadorMensaje.current)
@@ -277,10 +281,65 @@ function Catalogo({ negocioId }) {
     }
   }
 
-  function abrirDetalle(producto) {
+  // --- MODIFICADO: abrirDetalle ahora es async y carga los lotes del producto ---
+  async function abrirDetalle(producto) {
     setProductoAbiertoId(producto.id)
     setModalFormulario(null)
     setSugerencia(null)
+    setLotesProducto([])
+
+    try {
+      const detalle = await apiGet(
+        `/negocios/${negocioId}/productos/${producto.id}/`
+      )
+
+      if (Array.isArray(detalle.lotes)) {
+        setLotesProducto(detalle.lotes)
+      }
+    } catch (error) {
+      mostrarMensaje("No se pudieron cargar los lotes del producto.", "error")
+    }
+  }
+
+  // --- NUEVO: guardar cantidad corregida de un lote_producto ---
+  async function guardarCantidadLote(loteProducto, nuevaCantidad) {
+    const cantidad = convertirNumero(nuevaCantidad)
+
+    if (cantidad < 0) {
+      mostrarMensaje("La cantidad no puede ser negativa.", "error")
+      return
+    }
+
+    try {
+      setGuardandoLote(loteProducto.lote_producto_id)
+
+      await apiPut(
+        `/negocios/${negocioId}/lotes/${loteProducto.lote_id}/productos/${loteProducto.lote_producto_id}/`,
+        {
+          costo_usd: loteProducto.costo_usd,
+          cantidad_comprada: cantidad,
+          precio_sugerido: loteProducto.precio_sugerido,
+        }
+      )
+
+      mostrarMensaje("Cantidad actualizada correctamente.")
+      await cargarDatos()
+
+      const detalle = await apiGet(
+        `/negocios/${negocioId}/productos/${productoAbiertoId}/`
+      )
+
+      if (Array.isArray(detalle.lotes)) {
+        setLotesProducto(detalle.lotes)
+      }
+    } catch (error) {
+      mostrarMensaje(
+        error?.message || "No se pudo actualizar la cantidad.",
+        "error"
+      )
+    } finally {
+      setGuardandoLote(null)
+    }
   }
 
   function abrirCreacion() {
@@ -371,8 +430,6 @@ function Catalogo({ negocioId }) {
     try {
       setGenerandoCatalogo(true)
 
-      // URL de tu backend (la misma base que usa el resto de la app).
-      // Si tu apiPost apunta a ngrok, poné esa URL acá también.
       const API_BASE = "https://cornflake-exorcist-facsimile.ngrok-free.dev"
 
       const respuesta = await fetch(
@@ -824,9 +881,12 @@ function Catalogo({ negocioId }) {
       {productoAbierto && !modalFormulario && (
         <ModalProducto
           producto={productoAbierto}
+          lotesProducto={lotesProducto}
+          guardandoLote={guardandoLote}
           onCerrar={cerrarModal}
           onEditar={() => abrirEdicion(productoAbierto)}
           onEliminar={() => borrarProducto(productoAbierto)}
+          onGuardarCantidad={guardarCantidadLote}
           eliminando={eliminando}
         />
       )}
@@ -948,12 +1008,41 @@ function TarjetaProducto({ producto, seleccionado, onAbrir, onSeleccionar }) {
 
 function ModalProducto({
   producto,
+  lotesProducto,
+  guardandoLote,
   onCerrar,
   onEditar,
   onEliminar,
+  onGuardarCantidad,
   eliminando,
 }) {
   const estado = obtenerEstadoStock(producto.stock)
+  const [cantidadesEditadas, setCantidadesEditadas] = useState({})
+
+  function cambiarCantidad(loteProductoId, valor) {
+    setCantidadesEditadas((anterior) => ({
+      ...anterior,
+      [loteProductoId]: valor,
+    }))
+  }
+
+  function obtenerCantidadActual(loteProducto) {
+    const editada = cantidadesEditadas[loteProducto.lote_producto_id]
+
+    if (editada !== undefined) {
+      return editada
+    }
+
+    return String(loteProducto.cantidad_comprada ?? "")
+  }
+
+  function cantidadCambio(loteProducto) {
+    const editada = cantidadesEditadas[loteProducto.lote_producto_id]
+
+    if (editada === undefined) return false
+
+    return String(editada) !== String(loteProducto.cantidad_comprada ?? "")
+  }
 
   return (
     <Modal
@@ -1035,6 +1124,75 @@ function ModalProducto({
           </span>
         </div>
       </div>
+
+      {lotesProducto.length > 0 && (
+        <div className="cat-detalle-lotes">
+          <h4 className="cat-lotes-titulo">Lotes asociados</h4>
+
+          {lotesProducto.map((loteProducto) => (
+            <div
+              key={loteProducto.lote_producto_id}
+              className="cat-lote-fila"
+            >
+              <div className="cat-lote-info">
+                <span className="cat-lote-nombre">
+                  {loteProducto.lote_descripcion || "Lote " + loteProducto.lote_id}
+                </span>
+                <span className="cat-lote-fecha">
+                  {loteProducto.lote_fecha}
+                  {loteProducto.costo_usd != null &&
+                    ` · USD ${formatearDecimal(loteProducto.costo_usd)}`}
+                </span>
+              </div>
+
+              <div className="cat-lote-cantidad">
+                <label
+                  htmlFor={`cant-lote-${loteProducto.lote_producto_id}`}
+                  className="cat-lote-label"
+                >
+                  Cantidad
+                </label>
+
+                <div className="cat-lote-input-grupo">
+                  <input
+                    id={`cant-lote-${loteProducto.lote_producto_id}`}
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={obtenerCantidadActual(loteProducto)}
+                    onChange={(evento) =>
+                      cambiarCantidad(
+                        loteProducto.lote_producto_id,
+                        evento.target.value
+                      )
+                    }
+                    className="cat-lote-input"
+                    disabled={guardandoLote === loteProducto.lote_producto_id}
+                  />
+
+                  {cantidadCambio(loteProducto) && (
+                    <button
+                      type="button"
+                      className="btn-principal cat-lote-btn-guardar"
+                      disabled={guardandoLote === loteProducto.lote_producto_id}
+                      onClick={() =>
+                        onGuardarCantidad(
+                          loteProducto,
+                          cantidadesEditadas[loteProducto.lote_producto_id]
+                        )
+                      }
+                    >
+                      {guardandoLote === loteProducto.lote_producto_id
+                        ? "..."
+                        : "Guardar"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="cat-detalle-acciones">
         <button type="button" className="btn-principal" onClick={onEditar}>
@@ -1283,7 +1441,6 @@ function SubidorImagen({ imagenUrl, onSubida, onQuitar, mostrarMensaje }) {
       return
     }
 
-    // Límite de seguridad: 10 MB (tope del plan free de Cloudinary)
     if (archivo.size > 10 * 1024 * 1024) {
       mostrarMensaje?.("La imagen es muy grande (máximo 10 MB).", "error")
       return
