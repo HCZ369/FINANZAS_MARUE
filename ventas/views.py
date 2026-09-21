@@ -926,6 +926,18 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       display: flex; align-items: center; justify-content: center; color: var(--ceniza);
       font-family: "Cinzel", serif; font-size: 3rem; letter-spacing: 0.1em;
     }}
+    .modal-miniaturas {{
+      display: flex; gap: 0.5rem; padding: 0.7rem 1.3rem 0;
+    }}
+    .miniatura {{
+      width: 60px; height: 60px; object-fit: cover;
+      border: 1px solid var(--borde); border-radius: 2px;
+      cursor: pointer; opacity: 0.5;
+      transition: opacity 160ms ease, border-color 160ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }}
+    .miniatura:hover {{ opacity: 0.8; }}
+    .miniatura.activa {{ opacity: 1; border-color: var(--vino-2); }}
     .modal-info {{ padding: 1.4rem 1.3rem 1.6rem; }}
     .modal-nombre {{
       font-family: "Cormorant Garamond", serif; font-weight: 500;
@@ -1034,10 +1046,33 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       '<path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 20zm4.4-6c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.7.9-.3.2-.5.1a6.5 6.5 0 0 1-3.2-2.8c-.2-.4.2-.4.6-1.2.1-.2 0-.3 0-.4l-.7-1.7c-.2-.5-.4-.4-.5-.4h-.5a1 1 0 0 0-.7.3A2.9 2.9 0 0 0 6.4 10a5 5 0 0 0 1.1 2.7 11.5 11.5 0 0 0 4.4 3.9c2 .8 2 .6 2.4.5a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .1-1.2c-.1-.1-.2-.2-.4-.3z"/>' +
       '</svg>';
 
+    function cambiarFoto(elemento, url) {{
+      var grande = document.getElementById("fotoGrande");
+      if (grande) {{
+        grande.src = url;
+      }}
+      var todas = document.querySelectorAll(".miniatura");
+      for (var i = 0; i < todas.length; i++) {{
+        todas[i].classList.remove("activa");
+      }}
+      elemento.classList.add("activa");
+    }}
+
     function abrirModal(p) {{
-      var foto = p.foto
-        ? '<div class="modal-foto"><img src="' + escapar(p.foto) + '" alt="' + escapar(p.nombre) + '" onerror="this.parentNode.outerHTML=\'<div class=modal-foto-vacia>M</div>\'"></div>'
-        : '<div class="modal-foto-vacia">M</div>';
+      var foto;
+
+      if (p.foto) {{
+        foto = '<div class="modal-foto"><img id="fotoGrande" src="' + escapar(p.foto) + '" alt="' + escapar(p.nombre) + '" onerror="this.parentNode.outerHTML=\'<div class=modal-foto-vacia>M</div>\'"></div>';
+
+        if (p.foto2) {{
+          foto += '<div class="modal-miniaturas">' +
+            '<img class="miniatura activa" src="' + escapar(p.foto) + '" alt="Vista 1" onclick="cambiarFoto(this, \'' + escapar(p.foto) + '\')">' +
+            '<img class="miniatura" src="' + escapar(p.foto2) + '" alt="Vista 2" onclick="cambiarFoto(this, \'' + escapar(p.foto2) + '\')">' +
+            '</div>';
+        }}
+      }} else {{
+        foto = '<div class="modal-foto-vacia">M</div>';
+      }}
 
       var detalles = "";
       if (p.material) {{
