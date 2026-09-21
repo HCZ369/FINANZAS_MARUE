@@ -70,7 +70,7 @@ class ClienteDetalleView(APIView):
 class ProductosView(APIView):
     def get(self, request, negocio_id):
         query = """
-            SELECT p.id, p.negocio_id, p.nombre, p.precio, p.imagen_url, o.imagen_url_2, p.estado,
+            SELECT p.id, p.negocio_id, p.nombre, p.precio, p.imagen_url, p.imagen_url_2, p.estado,
                    COALESCE(compras.total, 0) AS cantidad_comprada,
                    COALESCE(ventas_total.total, 0) AS cantidad_vendida,
                    COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock,
@@ -106,7 +106,7 @@ class ProductosView(APIView):
             OUTPUT INSERTED.id
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
-        parametros = [negocio_id, nombre, precio, imagen_url, categoria_id, descripcion, en_catalogo]
+        parametros = [negocio_id, nombre, precio, imagen_url, imagen_url_2, categoria_id, descripcion, en_catalogo]
         producto_id = execute_insert(query, parametros)
 
         lote_id = request.data.get("lote_id")
@@ -646,7 +646,7 @@ class InversionPorLoteView(APIView):
             lote["retiro_por_unidad"] = retiro_por_unidad
 
         return Response(lotes)
-    
+
 NUMERO_WHATSAPP = "595992188322"
 
 TEXTOS_NEGOCIO = {
@@ -678,7 +678,7 @@ class GenerarCatalogoView(APIView):
 
     def obtener_productos_con_stock(self, negocio_id):
         query = """
-            SELECT p.id, p.nombre, p.precio, p.imagen_url,
+            SELECT p.id, p.nombre, p.precio, p.imagen_url, p.imagen_url_2,
                    p.material, p.talla, p.descripcion,
                    c.nombre AS categoria_nombre,
                    COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock
