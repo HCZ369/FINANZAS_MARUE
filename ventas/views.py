@@ -32,7 +32,6 @@ class ClientesView(APIView):
 
         return Response({"mensaje": "Cliente registrado"})
 
-
 class ClienteDetalleView(APIView):
     def get(self, request, negocio_id, cliente_id):
         query = "SELECT * FROM cliente WHERE id = %s AND negocio_id = %s"
@@ -68,11 +67,10 @@ class ClienteDetalleView(APIView):
 
         return Response({"mensaje": "Cliente eliminado"})
 
-
 class ProductosView(APIView):
     def get(self, request, negocio_id):
         query = """
-            SELECT p.id, p.negocio_id, p.nombre, p.precio, p.imagen_url, p.estado,
+            SELECT p.id, p.negocio_id, p.nombre, p.precio, p.imagen_url, o.imagen_url_2, p.estado,
                    COALESCE(compras.total, 0) AS cantidad_comprada,
                    COALESCE(ventas_total.total, 0) AS cantidad_vendida,
                    COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock,
@@ -98,14 +96,15 @@ class ProductosView(APIView):
         nombre = request.data.get("nombre")
         precio = request.data.get("precio")
         imagen_url = request.data.get("imagen_url")
+        imagen_url_2 = request.data.get("imagen_url_2")
         categoria_id = request.data.get("categoria_id")
         descripcion = request.data.get("descripcion")
         en_catalogo = request.data.get("en_catalogo", True)
 
         query = """
-            INSERT INTO producto (negocio_id, nombre, precio, imagen_url, categoria_id, descripcion, en_catalogo)
+            INSERT INTO producto (negocio_id, nombre, precio, imagen_url, imagen_url_2, categoria_id, descripcion, en_catalogo)
             OUTPUT INSERTED.id
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
         parametros = [negocio_id, nombre, precio, imagen_url, categoria_id, descripcion, en_catalogo]
         producto_id = execute_insert(query, parametros)
@@ -155,6 +154,7 @@ class ProductoDetalleView(APIView):
         nombre = request.data.get("nombre")
         precio = request.data.get("precio")
         imagen_url = request.data.get("imagen_url")
+        imagen_url_2 = request.data.get("imagen_url_2")
         categoria_id = request.data.get("categoria_id")
         descripcion = request.data.get("descripcion")
         material = request.data.get("material")
@@ -164,11 +164,11 @@ class ProductoDetalleView(APIView):
 
         query = """
             UPDATE producto
-               SET nombre = %s, precio = %s, imagen_url = %s, categoria_id = %s,
+               SET nombre = %s, precio = %s, imagen_url = %s, imagen_url_2 = %s, categoria_id = %s,
                    descripcion = %s, material = %s, talla = %s, en_catalogo = %s
              WHERE id = %s AND negocio_id = %s
         """
-        parametros = [nombre, precio, imagen_url, categoria_id, descripcion, material, talla, en_catalogo, producto_id, negocio_id]
+        parametros = [nombre, precio, imagen_url, imagen_url_2, categoria_id, descripcion, material, talla, en_catalogo, producto_id, negocio_id]
 
         filas_afectadas = execute_command(query, parametros)
 
@@ -655,7 +655,6 @@ TEXTOS_NEGOCIO = {
     3: {"titulo": "Marué Lab", "subtitulo": "Cartucheras porta-cuchillos artesanales"},
 }
 
-
 class GenerarCatalogoView(APIView):
     def post(self, request, negocio_id):
         return self._generar(negocio_id)
@@ -707,6 +706,7 @@ class GenerarCatalogoView(APIView):
                 "talla": p.get("talla") or "",
                 "descripcion": p.get("descripcion") or "",
                 "foto": self.optimizar_cloudinary(p.get("imagen_url") or ""),
+                "foto2": self.optimizar_cloudinary(p.get("imagen_url_2") or ""),
                 "categoria": p.get("categoria_nombre") or "Otros",
             })
 

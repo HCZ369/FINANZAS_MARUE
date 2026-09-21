@@ -47,6 +47,7 @@ const FORMULARIO_INICIAL = {
   nombre: "",
   precio: "",
   imagenUrl: "",
+  imagenUrl2: "",
   categoriaId: "",
   descripcion: "",
   material: "",
@@ -185,6 +186,7 @@ function Catalogo({ negocioId }) {
         nombre: producto.nombre?.trim() || "Producto sin nombre",
         precio: convertirNumero(producto.precio),
         imagen_url: producto.imagen_url || "",
+        imagen_url_2: producto.imagen_url_2 || "",
         material: producto.material || "",
         talla: producto.talla || "",
         descripcion: producto.descripcion || "",
@@ -389,6 +391,7 @@ function Catalogo({ negocioId }) {
       nombre: producto.nombre || "",
       precio: valorParaInput(producto.precio),
       imagenUrl: producto.imagen_url || "",
+      imagenUrl2: producto.imagen_url_2 || "",
       categoriaId: valorParaInput(producto.categoria_id),
       descripcion: producto.descripcion || "",
       material: producto.material || "",
@@ -552,6 +555,7 @@ function Catalogo({ negocioId }) {
       nombre: formulario.nombre.trim(),
       precio: convertirNumero(formulario.precio),
       imagen_url: formulario.imagenUrl.trim() || null,
+      imagen_url_2: formulario.imagenUrl2.trim() || null,
       categoria_id: formulario.categoriaId ? Number(formulario.categoriaId) : null,
       descripcion: formulario.descripcion.trim() || null,
       material: formulario.material.trim() || null,
@@ -1110,6 +1114,19 @@ function ModalProducto({
         </span>
       </div>
 
+      {producto.imagen_url_2 && (
+        <div
+          className="cat-detalle-visual"
+          style={{ backgroundColor: obtenerColorProducto(producto.nombre) }}
+        >
+          <ImagenProducto
+            src={producto.imagen_url_2}
+            alt={`${producto.nombre} - foto secundaria`}
+            className="cat-detalle-imagen"
+          />
+        </div>
+      )}
+
       <div className="cat-detalle-stats">
         <MetricaProducto
           valor={formatearMonto(producto.precio)}
@@ -1397,9 +1414,18 @@ function ModalFormularioProducto({
         </div>
 
         <SubidorImagen
+          etiqueta="Foto principal"
           imagenUrl={formulario.imagenUrl}
           onSubida={(url) => onCambiar("imagenUrl", url)}
           onQuitar={() => onCambiar("imagenUrl", "")}
+          mostrarMensaje={mostrarMensaje}
+        />
+
+        <SubidorImagen
+          etiqueta="Foto secundaria (opcional)"
+          imagenUrl={formulario.imagenUrl2}
+          onSubida={(url) => onCambiar("imagenUrl2", url)}
+          onQuitar={() => onCambiar("imagenUrl2", "")}
           mostrarMensaje={mostrarMensaje}
         />
 
@@ -1574,7 +1600,7 @@ function ModalFormularioProducto({
   )
 }
 
-function SubidorImagen({ imagenUrl, onSubida, onQuitar, mostrarMensaje }) {
+function SubidorImagen({ etiqueta = "Foto del producto", imagenUrl, onSubida, onQuitar, mostrarMensaje }) {
   const inputRef = useRef(null)
   const [subiendo, setSubiendo] = useState(false)
   const [arrastrando, setArrastrando] = useState(false)
@@ -1666,7 +1692,7 @@ function SubidorImagen({ imagenUrl, onSubida, onQuitar, mostrarMensaje }) {
 
   return (
     <div className="campo">
-      <label>Foto del producto</label>
+      <label>{etiqueta}</label>
 
       {imagenUrl && (
         <div className="cat-preview-img" style={{ marginBottom: "0.6rem" }}>
