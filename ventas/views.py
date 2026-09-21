@@ -883,8 +883,8 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
 
     /* MODAL DETALLE */
     .modal-fondo {{
-      position: fixed; inset: 0; background: rgba(6, 5, 6, 0.92);
-      backdrop-filter: blur(6px);
+      position: fixed; inset: 0; background: rgba(6, 5, 6, 0.94);
+      backdrop-filter: blur(8px);
       display: flex; align-items: center; justify-content: center;
       z-index: 100; padding: 1rem;
       opacity: 0; visibility: hidden;
@@ -892,33 +892,40 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     }}
     .modal-fondo.abierto {{ opacity: 1; visibility: visible; }}
     .modal-caja {{
-      position: relative; max-width: 480px; width: 100%;
-      max-height: 92vh; overflow-y: auto;
-      background: linear-gradient(180deg, var(--panel) 0%, var(--negro-2) 100%);
+      --pad: 1.35rem;
+      position: relative; max-width: 440px; width: 100%;
+      max-height: 90vh; overflow-y: auto;
+      background: var(--panel);
       border: 1px solid var(--borde-luz); border-radius: 3px;
-      transform: scale(0.96);
-      transition: transform 220ms ease;
+      transform: scale(0.97) translateY(6px);
+      transition: transform 240ms cubic-bezier(0.2, 0.8, 0.3, 1);
     }}
-    .modal-fondo.abierto .modal-caja {{ transform: scale(1); }}
+    .modal-fondo.abierto .modal-caja {{ transform: scale(1) translateY(0); }}
     .modal-cerrar {{
-      position: absolute; top: 0.8rem; right: 0.8rem;
-      width: 36px; height: 36px;
-      background: rgba(6, 5, 6, 0.6);
-      border: 1px solid var(--borde);
-      color: var(--hueso); font-size: 1.4rem; line-height: 1;
+      position: absolute; top: 0.75rem; right: 0.75rem;
+      width: 34px; height: 34px;
+      background: rgba(6, 5, 6, 0.75);
+      border: 1px solid rgba(231, 224, 228, 0.15);
+      color: var(--hueso); font-size: 1.3rem; line-height: 1;
       cursor: pointer; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      z-index: 2;
+      z-index: 3;
       -webkit-tap-highlight-color: transparent;
-      transition: all 180ms ease;
+      transition: background-color 180ms ease, border-color 180ms ease;
     }}
     .modal-cerrar:hover {{ background: var(--vino); border-color: var(--vino); }}
+
     .modal-foto {{
+      position: relative;
       width: 100%; aspect-ratio: 1 / 1;
       background: var(--negro-2); overflow: hidden;
     }}
     .modal-foto img {{
       width: 100%; height: 100%; object-fit: cover; display: block;
+    }}
+    .modal-foto::after {{
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(180deg, transparent 80%, rgba(16, 13, 16, 0.85) 100%);
     }}
     .modal-foto-vacia {{
       width: 100%; aspect-ratio: 1 / 1;
@@ -926,69 +933,81 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       display: flex; align-items: center; justify-content: center; color: var(--ceniza);
       font-family: "Cinzel", serif; font-size: 3rem; letter-spacing: 0.1em;
     }}
+
     .modal-miniaturas {{
-      display: flex; gap: 0.5rem; padding: 0.7rem 1.3rem 0;
+      display: flex; gap: 0.5rem;
+      padding: var(--pad) var(--pad) 0;
     }}
     .miniatura {{
-      width: 60px; height: 60px; object-fit: cover;
+      width: 54px; height: 54px; object-fit: cover;
       border: 1px solid var(--borde); border-radius: 2px;
-      cursor: pointer; opacity: 0.5;
+      cursor: pointer; opacity: 0.45;
       transition: opacity 160ms ease, border-color 160ms ease;
       -webkit-tap-highlight-color: transparent;
     }}
-    .miniatura:hover {{ opacity: 0.8; }}
+    .miniatura:hover {{ opacity: 0.75; }}
     .miniatura.activa {{ opacity: 1; border-color: var(--vino-2); }}
-    .modal-info {{ padding: 1.4rem 1.3rem 1.6rem; }}
+
+    .modal-info {{
+      display: flex; flex-direction: column;
+      padding: var(--pad);
+    }}
     .modal-nombre {{
       font-family: "Cormorant Garamond", serif; font-weight: 500;
-      font-size: 1.55rem; line-height: 1.15; color: var(--hueso);
-      margin-bottom: 0.4rem;
+      font-size: 1.5rem; line-height: 1.2; color: var(--hueso);
+      letter-spacing: 0.01em;
     }}
     .modal-precio {{
       font-family: "Cinzel", serif; font-weight: 500;
-      font-size: 1.35rem; color: var(--vino-2);
-      letter-spacing: 0.03em; margin-bottom: 1rem;
+      font-size: 1.05rem; color: var(--vino-2);
+      letter-spacing: 0.05em; margin-top: 0.3rem;
     }}
+
     .modal-detalles {{
-      display: flex; flex-direction: column; gap: 0.55rem;
-      margin-bottom: 1.2rem;
-      padding-top: 1rem; border-top: 1px solid var(--borde);
+      display: grid; grid-template-columns: auto 1fr;
+      gap: 0.45rem 1rem;
+      margin-top: 1.25rem; padding-top: 1.1rem;
+      border-top: 1px solid var(--borde);
     }}
-    .modal-detalle-item {{
-      display: flex; gap: 0.6rem; font-size: 0.85rem;
-    }}
+    .modal-detalle-item {{ display: contents; }}
     .modal-detalle-item b {{
-      color: var(--hueso-tenue); font-weight: 400;
-      min-width: 90px; text-transform: uppercase;
-      font-size: 0.68rem; letter-spacing: 0.14em; padding-top: 0.15rem;
+      color: var(--ceniza); font-weight: 400;
+      text-transform: uppercase; white-space: nowrap;
+      font-size: 0.64rem; letter-spacing: 0.15em;
+      align-self: center;
     }}
-    .modal-detalle-item span {{ color: var(--hueso); }}
+    .modal-detalle-item span {{
+      color: var(--hueso-tenue); font-size: 0.85rem; line-height: 1.4;
+    }}
+
     .modal-descripcion {{
-      color: var(--hueso-tenue); font-size: 0.92rem;
-      line-height: 1.5; margin-bottom: 1.4rem;
-      padding-top: 1rem; border-top: 1px solid var(--borde);
+      color: var(--hueso-tenue); font-size: 0.88rem;
+      line-height: 1.65; margin-top: 1.25rem;
     }}
+
     .modal-btn-wa {{
       display: flex; align-items: center; justify-content: center;
-      gap: 0.6rem; width: 100%;
+      gap: 0.55rem; width: 100%;
+      margin-top: 1.6rem;
       background: var(--wa-verde); color: #fff;
       border: none; border-radius: 3px;
-      padding: 1rem 1.2rem;
+      padding: 0.95rem 1.2rem;
       font-family: "Jost", sans-serif; font-weight: 500;
-      font-size: 1rem; letter-spacing: 0.06em;
+      font-size: 0.95rem; letter-spacing: 0.05em;
       cursor: pointer; text-decoration: none;
       -webkit-tap-highlight-color: transparent;
       transition: transform 160ms ease, box-shadow 160ms ease;
     }}
     .modal-btn-wa:hover {{
       transform: translateY(-1px);
-      box-shadow: 0 8px 24px -8px rgba(37, 211, 102, 0.5);
+      box-shadow: 0 8px 24px -8px rgba(37, 211, 102, 0.45);
     }}
-    .modal-btn-wa svg {{ width: 22px; height: 22px; }}
+    .modal-btn-wa svg {{ width: 20px; height: 20px; }}
 
     @media (min-width: 620px) {{
-      .modal-info {{ padding: 1.8rem 1.7rem 2rem; }}
-      .modal-nombre {{ font-size: 1.75rem; }}
+      .modal-caja {{ --pad: 1.7rem; max-width: 470px; }}
+      .modal-nombre {{ font-size: 1.7rem; }}
+      .modal-precio {{ font-size: 1.15rem; }}
     }}
   </style>
 </head>
