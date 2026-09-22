@@ -1168,7 +1168,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     }}
 
     function construirFiltros() {{
-      var ORDEN = ["Anillos", "Aros", "Cadenas", "Chokers", "Collares", "Conjuntos", "Dijes", "Llaveros", "Muñequeras", "Pendientes", "Pines", "Pulseras", "Soportes", "Otros"];
+      var ORDEN = ["Anillos", "Aros", "Billeteras", "Cadenas", "Chokers", "Collares", "Conjuntos", "Dijes", "Llaveros", "Muñequeras", "Pendientes", "Pines", "Pulseras", "Soportes", "Otros"];
       var presentes = {{}};
       PRODUCTOS.forEach(function (p) {{ presentes[p.categoria || "Otros"] = true; }});
       var lista = ["Todos"];
