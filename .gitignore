@@ -15,3 +15,5 @@ migrar_a_neon.py
 .idea/
 .DS_Store
 Thumbs.db
+
+automatizacion/chrome_profile/
