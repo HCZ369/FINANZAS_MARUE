@@ -84,6 +84,7 @@ function Catalogo({ negocioId }) {
   const [eliminando, setEliminando] = useState(false)
   const [calculandoSugerencia, setCalculandoSugerencia] = useState(false)
   const [generandoCatalogo, setGenerandoCatalogo] = useState(false)
+  const [publicando, setPublicando] = useState(false)
 
   // --- NUEVO: estado para lotes del producto abierto ---
   const [lotesProducto, setLotesProducto] = useState([])
