@@ -514,6 +514,26 @@ function Catalogo({ negocioId }) {
       setGenerandoCatalogo(false)
     }
   }
+  
+  async function publicarEnNetlify() {
+    try {
+      setPublicando(true)
+
+      const resultado = await apiPost(
+        `/negocios/${negocioId}/publicar-netlify/`,
+        {}
+      )
+
+      mostrarMensaje(resultado?.mensaje || "Catálogo publicado.")
+    } catch (error) {
+      mostrarMensaje(
+        error?.message || "No se pudo publicar en Netlify.",
+        "error"
+      )
+    } finally {
+      setPublicando(false)
+    }
+  }
 
   function validarFormulario() {
     if (!formulario.nombre.trim()) {
@@ -728,6 +748,15 @@ function Catalogo({ negocioId }) {
             disabled={generandoCatalogo}
           >
             {generandoCatalogo ? "Generando..." : "Descargar catálogo"}
+          </button>
+
+          <button
+            type="button"
+            className="btn-secundario"
+            onClick={publicarEnNetlify}
+            disabled={publicando}
+          >
+            {publicando ? "Publicando..." : "Publicar en Netlify"}
           </button>
 
           <button

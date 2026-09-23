@@ -8,6 +8,9 @@ from core.db import fetch_all, execute_command, fetch_one, execute_insert
 from django.db import transaction
 from django.http import HttpResponse
 
+import subprocess
+import sys
+
 class ClientesView(APIView):
     def get(self, request, negocio_id):
         query = "SELECT * FROM cliente ORDER BY nombre"
@@ -1304,3 +1307,20 @@ class MovimientosView(APIView):
         """
         mov_id = execute_insert(query, [cuenta_id, tipo, monto, fecha, concepto, cuenta_destino_id])
         return Response({"mensaje": "Movimiento registrado", "mov_id": mov_id})
+
+class PublicarNetlifyView(APIView):
+    def post(self, request, negocio_id):
+        ruta_script = r"C:\Dev\gestor\automatizacion\netlify_chrome.py"
+
+        try:
+            resultado = subprocess.run(
+                [sys.executable, ruta_script],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        except subprocess.TimeoutExpired:
+            return Response({
+                "error": "El script falló.",
+                "detalle": resultado.stderr[-500:],
+            }, status=500)

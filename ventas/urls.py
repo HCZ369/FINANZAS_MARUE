@@ -20,4 +20,5 @@ urlpatterns = [
     path("generar-catalogo/", views.GenerarCatalogoView.as_view(), name="generar_catalogo"),
     path("cuentas/", views.CuentasView.as_view(), name="cuentas"),
     path("movimientos/", views.MovimientosView.as_view(), name="movimientos"),
+    path("publicar-netlify/", views.PublicarNetlifyView.as_view(), name="publicar_netlify"),
 ]
