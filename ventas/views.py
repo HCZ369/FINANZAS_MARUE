@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from core.db import fetch_all, execute_command, fetch_one, execute_insert
 from django.db import transaction
 from django.http import HttpResponse
+from core.lotes import sincronizar_gasto_de_lote
 
 import subprocess
 import sys
@@ -129,6 +130,8 @@ class ProductosView(APIView):
             """
             execute_command(query_lp, [lote_id, producto_id, costo_usd, costo, cantidad_comprada, precio_sugerido])
 
+        sincronizar_gasto_de_lote(lote_id)
+
         return Response({"mensaje": "Producto creado", "producto_id": producto_id})
 
 class ProductoDetalleView(APIView):
@@ -181,11 +184,24 @@ class ProductoDetalleView(APIView):
         return Response({"mensaje": "Producto actualizado"})
 
     def delete(self, request, negocio_id, producto_id):
-        query = "DELETE FROM producto WHERE id = %s AND negocio_id = %s"
-        filas_afectadas = execute_command(query, [producto_id, negocio_id])
+        query_ventas = "SELECT COUNT(*) AS total FROM venta_detalle WHERE producto_id = %s"
+        fila_ventas = fetch_one(query_ventas, [producto_id])
+
+        if fila_ventas["total"] > 0:
+            return Response({"error": "No se puede eliminar: el producto tiene ventas"}, status=400)
+
+        query_lotes = "SELECT lote_id FROM lote_producto WHERE producto_id = %s"
+        lotes_afectados = fetch_all(query_lotes, [producto_id])
+
+        execute_command("DELETE FROM lote_producto WHERE producto_id = %s", [producto_id])
+
+        filas_afectadas = execute_command("DELETE FROM producto WHERE id = %s AND negocio_id = %s", [producto_id, negocio_id])
 
         if filas_afectadas == 0:
             return Response({"error": "Producto no eliminado"}, status=404)
+
+        for fila in lotes_afectados:
+            sincronizar_gasto_de_lote(fila["lote_id"])
 
         return Response({"mensaje": "Producto eliminado"})
 
@@ -427,6 +443,8 @@ class LotesView(APIView):
         parametros = [negocio_id, fecha, tasa_cambio, descripcion, plataforma, costo_retiro]
         lote_id = execute_insert(query, parametros)
 
+        sincronizar_gasto_de_lote(lote_id)
+
         return Response({"mensaje": "Lote creado", "lote_id": lote_id})
 
 class LoteDetalleView(APIView):
@@ -467,14 +485,36 @@ class LoteDetalleView(APIView):
         if filas_afectadas == 0:
             return Response({"error": "Lote no actualizado"}, status=404)
 
+        query_costos = """
+            UPDATE lote_producto
+               SET costo = costo_usd * (SELECT tasa_cambio FROM lote WHERE id = %s)
+             WHERE lote_id = %s
+        """
+        execute_command(query_costos, [lote_id, lote_id])
+
+        sincronizar_gasto_de_lote(lote_id)
+
         return Response({"mensaje": "Lote actualizado"})
 
     def delete(self, request, negocio_id, lote_id):
-        query = "DELETE FROM lote WHERE id = %s AND negocio_id = %s"
-        filas_afectadas = execute_command(query, [lote_id, negocio_id])
+        lote = fetch_one("SELECT id FROM lote WHERE id = %s AND negocio_id = %s", [lote_id, negocio_id])
 
-        if filas_afectadas == 0:
+        if lote is None:
             return Response({"error": "Lote no encontrado"}, status=404)
+
+        query_ventas = """
+            SELECT COUNT(*) AS total
+              FROM venta_detalle
+             WHERE lote_producto_id IN (SELECT id FROM lote_producto WHERE lote_id = %s)
+        """
+        fila_ventas = fetch_one(query_ventas, [lote_id])
+
+        if fila_ventas["total"] > 0:
+            return Response({"error": "No se puede eliminar: el lote tiene ventas asociadas"}, status=400)
+
+        execute_command("DELETE FROM lote_producto WHERE lote_id = %s", [lote_id])
+        execute_command("DELETE FROM gasto WHERE lote_id = %s", [lote_id])
+        execute_command("DELETE FROM lote WHERE id = %s AND negocio_id = %s", [lote_id, negocio_id])
 
         return Response({"mensaje": "Lote eliminado"})
 
@@ -501,6 +541,8 @@ class LoteProductoView(APIView):
         parametros = [lote_id, producto_id, costo_usd, costo, cantidad_comprada, precio_sugerido]
         lote_producto_id = execute_insert(query, parametros)
 
+        sincronizar_gasto_de_lote(lote_id)
+
         return Response({"mensaje": "Producto agregado al lote", "lote_producto_id": lote_producto_id})
 
 class LoteProductoDetalleView(APIView):
@@ -525,14 +567,24 @@ class LoteProductoDetalleView(APIView):
         if filas_afectadas == 0:
             return Response({"error": "Producto del lote no actualizado"}, status=404)
 
+        sincronizar_gasto_de_lote(lote_id)
+
         return Response({"mensaje": "Producto del lote actualizado"})
 
     def delete(self, request, negocio_id, lote_id, lote_producto_id):
+        query_ventas = "SELECT COUNT(*) AS total FROM venta_detalle WHERE lote_producto_id = %s"
+        fila_ventas = fetch_one(query_ventas, [lote_producto_id])
+
+        if fila_ventas["total"] > 0:
+            return Response({"error": "No se puede eliminar: tiene ventas asociadas"}, status=400)
+
         query = "DELETE FROM lote_producto WHERE id = %s AND lote_id = %s"
         filas_afectadas = execute_command(query, [lote_producto_id, lote_id])
 
         if filas_afectadas == 0:
             return Response({"error": "Producto del lote no encontrado"}, status=404)
+
+        sincronizar_gasto_de_lote(lote_id)
 
         return Response({"mensaje": "Producto del lote eliminado"})
 

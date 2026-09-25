@@ -86,7 +86,7 @@ class Command(BaseCommand):
     
     def obtener_productos_con_stock(self, negocio_id):
         query = """
-            SELECT p.id, p.nombre, p.precio, p.imagen_url,
+            SELECT p.id, p.nombre, p.precio, p.imagen_url, p.imagen_url_2,
                    p.material, p.talla, p.descripcion,
                    COALESCE(compras.total, 0) - COALESCE(ventas_total.total, 0) AS stock
               FROM producto p
