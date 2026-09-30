@@ -796,7 +796,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{titulo} | Joyería gótica y accesorios de cuero en Asunción, Paraguay</title>
-  <meta name="description" content="{subtitulo}. Tienda online en Asunción, Paraguay. Anillos, collares, aros, pulseras y cuero hecho a mano. Delivery y envíos a todo el país.">
+  <meta name="description" content="{subtitulo}. Tienda online en Asunción, Paraguay. Anillos, collares, aros, pulseras y cuero hecho a mano. Delivery el mismo día y envíos a todo el país.">
   <link rel="canonical" href="https://marue-dark.netlify.app/">
 
   <meta property="og:type" content="website">
@@ -1031,8 +1031,8 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     .modal-fondo.abierto {{ opacity: 1; visibility: visible; }}
     .modal-caja {{
       position: relative;
-      width: 100%; max-width: 380px;
-      max-height: 88vh; overflow-y: auto;
+      width: 100%; max-width: 400px;
+      max-height: 90vh; overflow-y: auto;
       background: var(--panel);
       border: 1px solid var(--borde-luz);
       transform: translateY(10px);
@@ -1074,12 +1074,12 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       font-family: "Cinzel", serif; font-size: 2.4rem; letter-spacing: 0.1em;
     }}
     .modal-miniaturas {{
-      position: absolute; bottom: 0.7rem; left: 0.7rem;
-      display: flex; gap: 0.4rem; z-index: 2;
+      display: flex; gap: 0.45rem;
+      padding: 0.8rem 1.35rem 0;
     }}
     .miniatura {{
-      width: 40px; height: 40px; object-fit: cover;
-      border: 1px solid rgba(231, 224, 228, 0.25);
+      width: 44px; height: 44px; object-fit: cover;
+      border: 1px solid var(--borde);
       cursor: pointer; opacity: 0.5;
       transition: opacity 160ms ease, border-color 160ms ease;
       -webkit-tap-highlight-color: transparent;
@@ -1149,17 +1149,11 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       margin-top: 0.7rem;
     }}
 
-    @media (min-width: 760px) {{
-      .modal-caja {{
-        max-width: 720px;
-        display: grid; grid-template-columns: 300px 1fr;
-        max-height: 82vh; overflow: hidden;
-      }}
-      .modal-visual {{ height: 100%; }}
-      .modal-foto, .modal-foto-vacia {{ height: 100%; aspect-ratio: auto; }}
-      .modal-info {{ overflow-y: auto; padding: 1.7rem 1.8rem; }}
-      .modal-nombre {{ font-size: 1.5rem; }}
-      .modal-precio {{ font-size: 1.02rem; }}
+    @media (min-width: 620px) {{
+      .modal-caja {{ max-width: 430px; }}
+      .modal-info {{ padding: 1.5rem 1.6rem 1.7rem; }}
+      .modal-nombre {{ font-size: 1.45rem; }}
+      .modal-precio {{ font-size: 1rem; }}
     }}
   </style>
 </head>
