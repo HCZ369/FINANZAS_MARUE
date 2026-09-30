@@ -795,10 +795,45 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{titulo}</title>
+  <title>{titulo} | Joyería gótica y accesorios de cuero en Asunción, Paraguay</title>
+  <meta name="description" content="{subtitulo}. Tienda online en Asunción, Paraguay. Anillos, collares, aros, pulseras y cuero hecho a mano. Delivery el mismo día y envíos a todo el país.">
+  <link rel="canonical" href="https://marue-dark.netlify.app/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{titulo}">
+  <meta property="og:title" content="{titulo} | Joyería gótica en Paraguay">
+  <meta property="og:description" content="{subtitulo}. Delivery el mismo día en Asunción, envíos a todo el país.">
+  <meta property="og:url" content="https://marue-dark.netlify.app/">
+  <meta property="og:image" content="https://res.cloudinary.com/zolcnxzz/image/upload/w_1200,h_630,c_pad,b_rgb:060506/v1790802457/Logo.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="es_PY">
+
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="https://res.cloudinary.com/zolcnxzz/image/upload/w_180,h_180,c_fill/v1790802457/Logo.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <!-- Meta Pixel Code -->
+  <script>
+  !function(f,b,e,v,n,t,s)
+  {{if(f.fbq)return;n=f.fbq=function(){{n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)}};
+  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+  n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', '3081649345376772');
+  fbq('track', 'PageView');
+  </script>
+  <noscript><img height="1" width="1" style="display:none"
+  src="https://www.facebook.com/tr?id=3081649345376772&amp;ev=PageView&amp;noscript=1"
+  /></noscript>
+  <!-- End Meta Pixel Code -->
+
   <style>
     *, *::before, *::after {{ box-sizing: border-box; }}
     * {{ margin: 0; padding: 0; }}
@@ -809,7 +844,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       --vino: #7c3a4e; --vino-1: #8a3a50; --vino-2: #b06074;
       --wa-verde: #25d366;
     }}
-    html {{ background: var(--negro); scrollbar-color: #2a2029 var(--negro); }}
+    html {{ background: var(--negro); scrollbar-color: #2a2029 var(--negro); scroll-behavior: smooth; }}
     body {{
       font-family: "Jost", "Segoe UI", sans-serif;
       background: radial-gradient(ellipse at 50% -10%, #16101580 0%, transparent 60%), var(--negro);
@@ -835,6 +870,17 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       font-size: clamp(0.95rem, 3.5vw, 1.15rem); color: var(--hueso-tenue);
       margin-top: 0.7rem; letter-spacing: 0.02em;
     }}
+    .nav-info {{
+      display: flex; justify-content: center; flex-wrap: wrap;
+      gap: 1.4rem; margin-top: 1.3rem;
+    }}
+    .nav-info a {{
+      color: var(--hueso-tenue); text-decoration: none;
+      font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase;
+      border-bottom: 1px solid transparent; padding-bottom: 2px;
+      transition: color 160ms ease, border-color 160ms ease;
+    }}
+    .nav-info a:hover {{ color: var(--vino-2); border-color: var(--vino-2); }}
     .buscador {{ display: flex; justify-content: center; margin-bottom: 1.4rem; }}
     .buscador input {{
       width: 100%; max-width: 380px; padding: 0.7rem 1rem;
@@ -935,6 +981,48 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       text-align: center; color: #4d454d; font-size: 0.64rem;
       letter-spacing: 0.2em; text-transform: uppercase; margin-top: 3.5rem;
     }}
+
+    /* SECCIONES DE INFORMACION */
+    .seccion {{
+      max-width: 620px; margin: 4.5rem auto 0;
+      padding-top: 3rem; border-top: 1px solid var(--borde);
+      scroll-margin-top: 1.5rem;
+    }}
+    .seccion h2 {{
+      font-family: "Cinzel", serif; font-weight: 600;
+      font-size: 1.15rem; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--hueso); text-align: center; margin-bottom: 1.8rem;
+    }}
+    .seccion p {{
+      color: var(--hueso-tenue); font-size: 0.92rem;
+      line-height: 1.75; margin-bottom: 1rem;
+    }}
+    .seccion p em {{
+      font-family: "Cormorant Garamond", serif;
+      font-style: italic; color: var(--ceniza);
+    }}
+    .faq-item {{ border-bottom: 1px solid var(--borde); }}
+    .faq-item summary {{
+      cursor: pointer; list-style: none;
+      padding: 0.95rem 0.2rem;
+      font-size: 0.9rem; color: var(--hueso);
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 1rem;
+      -webkit-tap-highlight-color: transparent;
+    }}
+    .faq-item summary::-webkit-details-marker {{ display: none; }}
+    .faq-item summary::after {{
+      content: "+"; color: var(--vino-2);
+      font-size: 1.1rem; line-height: 1;
+      transition: transform 200ms ease;
+    }}
+    .faq-item[open] summary::after {{ transform: rotate(45deg); }}
+    .faq-item summary:hover {{ color: var(--vino-2); }}
+    .faq-respuesta {{
+      color: var(--hueso-tenue); font-size: 0.86rem;
+      line-height: 1.7; padding: 0 0.2rem 1.1rem;
+    }}
+    .faq-respuesta b {{ color: var(--hueso); font-weight: 500; }}
 
     /* MODAL DETALLE */
     .modal-fondo {{
@@ -1071,6 +1159,11 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     <header class="head">
       <h1>{titulo}</h1>
       <p class="sub">{subtitulo}</p>
+      <nav class="nav-info">
+        <a href="#como-comprar">Cómo comprar</a>
+        <a href="#nosotros">Nosotros</a>
+        <a href="https://instagram.com/marue_dark_" target="_blank" rel="noopener">Instagram</a>
+      </nav>
     </header>
     <div class="buscador">
       <input type="text" id="buscar" placeholder="Buscar pieza o material" autocomplete="off">
@@ -1079,7 +1172,92 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     <div class="contador" id="contador"></div>
     <div class="grilla" id="grilla"></div>
     <div class="vacio" id="vacio" style="display:none;">No se encontraron piezas.</div>
-    <footer class="footer">Tienda 100% online. Realizamos delivery y envíos a todo el país. No contamos con local físico.</footer>
+
+    <section class="seccion" id="como-comprar">
+      <h2>Cómo comprar</h2>
+
+      <details class="faq-item">
+        <summary>¿Cómo hago mi pedido?</summary>
+        <div class="faq-respuesta">
+          Tocá la pieza que te guste y escribinos por WhatsApp desde el botón
+          <b>Consultar</b>. Te confirmamos disponibilidad y coordinamos el pago
+          y la entrega. Atendemos de <b>9:00 a 19:00 hs</b>.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Qué medios de pago aceptan?</summary>
+        <div class="faq-respuesta">
+          Efectivo, transferencia bancaria y pago con QR.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Cómo son los envíos?</summary>
+        <div class="faq-respuesta">
+          En Asunción y alrededores hacemos <b>delivery</b>; el costo varía según
+          la zona y te lo pasamos al confirmar el pedido. Al interior del país
+          enviamos por <b>Multienvíos</b>. El envío sale <b>el mismo día</b>
+          una vez confirmado el pago. No ofrecemos envío gratis.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Puedo retirar en persona?</summary>
+        <div class="faq-respuesta">
+          Sí. Coordinamos entrega en mano en la zona del
+          <b>Shopping Paseo La Galería</b>, Asunción.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Lo que veo está disponible?</summary>
+        <div class="faq-respuesta">
+          Sí. Todo lo publicado en este catálogo es stock real y disponible.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Hacen piezas a pedido?</summary>
+        <div class="faq-respuesta">
+          Sí, en cuero. Los pedidos entran al taller con una
+          <b>seña del 50%</b>. Escribinos y lo conversamos.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Aceptan cambios o devoluciones?</summary>
+        <div class="faq-respuesta">
+          No aceptamos cambios ni devoluciones. Consultanos todo lo que
+          necesites antes de confirmar: medidas, colores o fotos extra,
+          sin problema.
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>¿Qué materiales usan?</summary>
+        <div class="faq-respuesta">
+          El material de cada pieza está indicado en su ficha. Declaramos los
+          materiales según la información del fabricante.
+        </div>
+      </details>
+    </section>
+
+    <section class="seccion" id="nosotros">
+      <h2>Nosotros</h2>
+      <p>
+        {titulo} nació en octubre de 2025 en Asunción, Paraguay. Somos una
+        tienda 100% online: no tenemos local físico, y todo lo que ves acá
+        existe y está disponible.
+      </p>
+      <p>
+        Seleccionamos joyería de estética oscura y fabricamos a mano nuestras
+        piezas de cuero. Cada objeto se elige por lo que dice sin hablar.
+      </p>
+      <p><em>Detrás de todo esto hay un ente etéreo y sin emociones.</em></p>
+    </section>
+
+    <footer class="footer">{titulo} · Asunción, Paraguay · Tienda 100% online</footer>
   </div>
 
   <!-- MODAL DE DETALLE -->
@@ -1107,7 +1285,10 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     function escapar(t) {{
       var d = document.createElement("div");
       d.textContent = t == null ? "" : String(t);
-      return d.innerHTML;
+      var texto = d.innerHTML;
+      texto = texto.split('"').join("&quot;");
+      texto = texto.split("'").join("&#39;");
+      return texto;
     }}
 
     function urlWhatsApp(p) {{
@@ -1170,13 +1351,22 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
           '<div class="modal-precio">' + escapar(p.precio) + '</div>' +
           (detalles ? '<div class="modal-detalles">' + detalles + '</div>' : '') +
           descripcion +
-          '<a href="' + urlWhatsApp(p) + '" target="_blank" rel="noopener" class="modal-btn-wa">' +
+          '<a href="' + urlWhatsApp(p) + '" target="_blank" rel="noopener" class="modal-btn-wa" id="btnWhatsApp">' +
             ICONO_WA + '<span>Consultar por WhatsApp</span>' +
           '</a>' +
         '</div>';
 
       modal.classList.add("abierto");
       document.body.classList.add("modal-abierto");
+
+      var btnWa = document.getElementById("btnWhatsApp");
+      if (btnWa) {{
+        btnWa.addEventListener("click", function () {{
+          if (typeof fbq === "function") {{
+            fbq("track", "Contact", {{ content_name: p.nombre }});
+          }}
+        }});
+      }}
     }}
 
     function cerrarModal() {{
@@ -1252,7 +1442,11 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
         var coincideCat = categoriaActiva === "Todos" || (p.categoria || "Otros") === categoriaActiva;
         if (!coincideCat) return false;
         if (!q) return true;
-        return normalizar(p.nombre).indexOf(q) !== -1 || normalizar(p.material).indexOf(q) !== -1;
+        if (normalizar(p.nombre).indexOf(q) !== -1) return true;
+        if (normalizar(p.material).indexOf(q) !== -1) return true;
+        if (normalizar(p.descripcion).indexOf(q) !== -1) return true;
+        if (normalizar(p.categoria).indexOf(q) !== -1) return true;
+        return false;
       }});
       render(filtrados);
     }}
