@@ -796,7 +796,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{titulo} | Joyería gótica y accesorios de cuero en Asunción, Paraguay</title>
-  <meta name="description" content="{subtitulo}. Tienda online en Asunción, Paraguay. Anillos, collares, aros, pulseras y cuero hecho a mano. Delivery el mismo día y envíos a todo el país.">
+  <meta name="description" content="{subtitulo}. Tienda online en Asunción, Paraguay. Anillos, collares, aros, pulseras y cuero hecho a mano. Delivery y envíos a todo el país.">
   <link rel="canonical" href="https://marue-dark.netlify.app/">
 
   <meta property="og:type" content="website">
@@ -842,7 +842,6 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       --borde: #241d24; --borde-luz: #3a2d38;
       --hueso: #e7e0e4; --hueso-tenue: #a99ea6; --ceniza: #6f6570;
       --vino: #7c3a4e; --vino-1: #8a3a50; --vino-2: #b06074;
-      --wa-verde: #25d366;
     }}
     html {{ background: var(--negro); scrollbar-color: #2a2029 var(--negro); scroll-behavior: smooth; }}
     body {{
@@ -997,10 +996,6 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       color: var(--hueso-tenue); font-size: 0.92rem;
       line-height: 1.75; margin-bottom: 1rem;
     }}
-    .seccion p em {{
-      font-family: "Cormorant Garamond", serif;
-      font-style: italic; color: var(--ceniza);
-    }}
     .faq-item {{ border-bottom: 1px solid var(--borde); }}
     .faq-item summary {{
       cursor: pointer; list-style: none;
@@ -1026,131 +1021,145 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
 
     /* MODAL DETALLE */
     .modal-fondo {{
-      position: fixed; inset: 0; background: rgba(6, 5, 6, 0.94);
-      backdrop-filter: blur(8px);
+      position: fixed; inset: 0; background: rgba(6, 5, 6, 0.93);
+      backdrop-filter: blur(10px);
       display: flex; align-items: center; justify-content: center;
       z-index: 100; padding: 1rem;
       opacity: 0; visibility: hidden;
-      transition: opacity 220ms ease, visibility 220ms ease;
+      transition: opacity 200ms ease, visibility 200ms ease;
     }}
     .modal-fondo.abierto {{ opacity: 1; visibility: visible; }}
     .modal-caja {{
-      --pad: 1.35rem;
-      position: relative; max-width: 440px; width: 100%;
-      max-height: 90vh; overflow-y: auto;
+      position: relative;
+      width: 100%; max-width: 380px;
+      max-height: 88vh; overflow-y: auto;
       background: var(--panel);
-      border: 1px solid var(--borde-luz); border-radius: 3px;
-      transform: scale(0.97) translateY(6px);
-      transition: transform 240ms cubic-bezier(0.2, 0.8, 0.3, 1);
+      border: 1px solid var(--borde-luz);
+      transform: translateY(10px);
+      transition: transform 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
     }}
-    .modal-fondo.abierto .modal-caja {{ transform: scale(1) translateY(0); }}
+    .modal-fondo.abierto .modal-caja {{ transform: translateY(0); }}
     .modal-cerrar {{
-      position: absolute; top: 0.75rem; right: 0.75rem;
-      width: 34px; height: 34px;
-      background: rgba(6, 5, 6, 0.75);
-      border: 1px solid rgba(231, 224, 228, 0.15);
-      color: var(--hueso); font-size: 1.3rem; line-height: 1;
-      cursor: pointer; border-radius: 50%;
+      position: absolute; top: 0.6rem; right: 0.6rem;
+      width: 28px; height: 28px;
+      background: rgba(6, 5, 6, 0.6);
+      border: none; border-radius: 50%;
+      color: var(--hueso-tenue); font-size: 1.05rem; line-height: 1;
+      cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       z-index: 3;
       -webkit-tap-highlight-color: transparent;
-      transition: background-color 180ms ease, border-color 180ms ease;
+      transition: color 160ms ease, background-color 160ms ease;
     }}
-    .modal-cerrar:hover {{ background: var(--vino); border-color: var(--vino); }}
+    .modal-cerrar:hover {{ color: var(--hueso); background: rgba(6, 5, 6, 0.9); }}
 
+    .modal-visual {{ position: relative; }}
     .modal-foto {{
       position: relative;
-      width: 100%; aspect-ratio: 1 / 1;
+      width: 100%; aspect-ratio: 4 / 5;
       background: var(--negro-2); overflow: hidden;
     }}
     .modal-foto img {{
       width: 100%; height: 100%; object-fit: cover; display: block;
+      filter: saturate(0.95) contrast(1.03);
     }}
     .modal-foto::after {{
       content: ""; position: absolute; inset: 0; pointer-events: none;
-      background: linear-gradient(180deg, transparent 80%, rgba(16, 13, 16, 0.85) 100%);
+      background: linear-gradient(180deg, transparent 72%, rgba(16, 13, 16, 0.92) 100%);
     }}
     .modal-foto-vacia {{
-      width: 100%; aspect-ratio: 1 / 1;
+      width: 100%; aspect-ratio: 4 / 5;
       background: repeating-linear-gradient(45deg, #0d0a0d 0 10px, #0a080a 10px 20px);
       display: flex; align-items: center; justify-content: center; color: var(--ceniza);
-      font-family: "Cinzel", serif; font-size: 3rem; letter-spacing: 0.1em;
+      font-family: "Cinzel", serif; font-size: 2.4rem; letter-spacing: 0.1em;
     }}
-
     .modal-miniaturas {{
-      display: flex; gap: 0.5rem;
-      padding: var(--pad) var(--pad) 0;
+      position: absolute; bottom: 0.7rem; left: 0.7rem;
+      display: flex; gap: 0.4rem; z-index: 2;
     }}
     .miniatura {{
-      width: 54px; height: 54px; object-fit: cover;
-      border: 1px solid var(--borde); border-radius: 2px;
-      cursor: pointer; opacity: 0.45;
+      width: 40px; height: 40px; object-fit: cover;
+      border: 1px solid rgba(231, 224, 228, 0.25);
+      cursor: pointer; opacity: 0.5;
       transition: opacity 160ms ease, border-color 160ms ease;
       -webkit-tap-highlight-color: transparent;
     }}
-    .miniatura:hover {{ opacity: 0.75; }}
+    .miniatura:hover {{ opacity: 0.8; }}
     .miniatura.activa {{ opacity: 1; border-color: var(--vino-2); }}
 
     .modal-info {{
       display: flex; flex-direction: column;
-      padding: var(--pad);
+      padding: 1.25rem 1.35rem 1.45rem;
+    }}
+    .modal-encabezado {{
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 1rem;
     }}
     .modal-nombre {{
       font-family: "Cormorant Garamond", serif; font-weight: 500;
-      font-size: 1.5rem; line-height: 1.2; color: var(--hueso);
-      letter-spacing: 0.01em;
+      font-size: 1.32rem; line-height: 1.25; color: var(--hueso);
+      letter-spacing: 0.01em; text-transform: capitalize;
     }}
     .modal-precio {{
       font-family: "Cinzel", serif; font-weight: 500;
-      font-size: 1.05rem; color: var(--vino-2);
-      letter-spacing: 0.05em; margin-top: 0.3rem;
+      font-size: 0.95rem; color: var(--vino-2);
+      letter-spacing: 0.04em; white-space: nowrap;
     }}
-
+    .modal-descripcion {{
+      color: var(--hueso-tenue); font-size: 0.85rem;
+      line-height: 1.7; margin-top: 0.9rem;
+      white-space: pre-line;
+    }}
     .modal-detalles {{
-      display: grid; grid-template-columns: auto 1fr;
-      gap: 0.45rem 1rem;
-      margin-top: 1.25rem; padding-top: 1.1rem;
+      margin-top: 1.15rem;
       border-top: 1px solid var(--borde);
     }}
-    .modal-detalle-item {{ display: contents; }}
+    .modal-detalle-item {{
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 1.2rem; padding: 0.55rem 0;
+      border-bottom: 1px solid #1a151a;
+    }}
     .modal-detalle-item b {{
       color: var(--ceniza); font-weight: 400;
+      font-size: 0.66rem; letter-spacing: 0.14em;
       text-transform: uppercase; white-space: nowrap;
-      font-size: 0.64rem; letter-spacing: 0.15em;
-      align-self: center;
     }}
     .modal-detalle-item span {{
-      color: var(--hueso-tenue); font-size: 0.85rem; line-height: 1.4;
+      color: var(--hueso-tenue); font-size: 0.82rem;
+      line-height: 1.45; text-align: right;
     }}
-
-    .modal-descripcion {{
-      color: var(--hueso-tenue); font-size: 0.88rem;
-      line-height: 1.65; margin-top: 1.25rem;
-    }}
-
     .modal-btn-wa {{
       display: flex; align-items: center; justify-content: center;
-      gap: 0.55rem; width: 100%;
-      margin-top: 1.6rem;
-      background: var(--wa-verde); color: #fff;
-      border: none; border-radius: 3px;
-      padding: 0.95rem 1.2rem;
-      font-family: "Jost", sans-serif; font-weight: 500;
-      font-size: 0.95rem; letter-spacing: 0.05em;
+      gap: 0.5rem; width: 100%;
+      margin-top: 1.3rem;
+      background: var(--vino); color: var(--hueso);
+      border: 1px solid var(--vino-1);
+      padding: 0.82rem 1.2rem;
+      font-family: "Jost", sans-serif; font-weight: 400;
+      font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase;
       cursor: pointer; text-decoration: none;
       -webkit-tap-highlight-color: transparent;
-      transition: transform 160ms ease, box-shadow 160ms ease;
+      transition: background-color 180ms ease, border-color 180ms ease;
     }}
-    .modal-btn-wa:hover {{
-      transform: translateY(-1px);
-      box-shadow: 0 8px 24px -8px rgba(37, 211, 102, 0.45);
+    .modal-btn-wa:hover {{ background: var(--vino-1); border-color: var(--vino-2); }}
+    .modal-btn-wa svg {{ width: 16px; height: 16px; opacity: 0.85; }}
+    .modal-nota {{
+      text-align: center; color: var(--ceniza);
+      font-size: 0.64rem; letter-spacing: 0.1em;
+      margin-top: 0.7rem;
     }}
-    .modal-btn-wa svg {{ width: 20px; height: 20px; }}
 
-    @media (min-width: 620px) {{
-      .modal-caja {{ --pad: 1.7rem; max-width: 470px; }}
-      .modal-nombre {{ font-size: 1.7rem; }}
-      .modal-precio {{ font-size: 1.15rem; }}
+    @media (min-width: 760px) {{
+      .modal-caja {{
+        max-width: 720px;
+        display: grid; grid-template-columns: 300px 1fr;
+        max-height: 82vh; overflow: hidden;
+      }}
+      .modal-visual {{ height: 100%; }}
+      .modal-foto, .modal-foto-vacia {{ height: 100%; aspect-ratio: auto; }}
+      .modal-info {{ overflow-y: auto; padding: 1.7rem 1.8rem; }}
+      .modal-nombre {{ font-size: 1.5rem; }}
+      .modal-precio {{ font-size: 1.02rem; }}
     }}
   </style>
 </head>
@@ -1246,15 +1255,22 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     <section class="seccion" id="nosotros">
       <h2>Nosotros</h2>
       <p>
-        {titulo} nació en octubre de 2025 en Asunción, Paraguay. Somos una
-        tienda 100% online: no tenemos local físico, y todo lo que ves acá
-        existe y está disponible.
+        Si llegaste hasta acá probablemente ya sabés qué estás buscando.
       </p>
       <p>
-        Seleccionamos joyería de estética oscura y fabricamos a mano nuestras
-        piezas de cuero. Cada objeto se elige por lo que dice sin hablar.
+        {titulo} existe desde octubre de 2025 en Asunción. Somos 100% online:
+        sin local, sin horarios de shopping, sin que nadie te mire raro por
+        preguntar el precio de un anillo con cabeza de cabra.
       </p>
-      <p><em>Detrás de todo esto hay un ente etéreo y sin emociones.</em></p>
+      <p>
+        Elegimos cada pieza. El cuero lo hacemos a mano. Y todo lo que ves
+        publicado está disponible de verdad.
+      </p>
+      <p>
+        Somos dos entes etéreos y sin emociones. Uno hace las piezas. El otro
+        hace que el negocio no se caiga. Es más o menos lo mismo. No preguntes
+        cuál te está respondiendo.
+      </p>
     </section>
 
     <footer class="footer">{titulo} · Asunción, Paraguay · Tienda 100% online</footer>
@@ -1279,6 +1295,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     var modal = document.getElementById("modal");
     var modalContenido = document.getElementById("modalContenido");
     var modalCerrar = document.getElementById("modalCerrar");
+    var modalCaja = modal.querySelector(".modal-caja");
 
     var categoriaActiva = "Todos";
 
@@ -1313,51 +1330,70 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       elemento.classList.add("activa");
     }}
 
-    function abrirModal(p) {{
-      var foto;
-
-      if (p.foto) {{
-        foto = '<div class="modal-foto"><img id="fotoGrande" src="' + escapar(p.foto) + '" alt="' + escapar(p.nombre) + '" onerror="this.parentNode.outerHTML=\'<div class=modal-foto-vacia>M</div>\'"></div>';
-
-        if (p.foto2) {{
-          foto += '<div class="modal-miniaturas">' +
-            '<img class="miniatura activa" src="' + escapar(p.foto) + '" alt="Vista 1" onclick="cambiarFoto(this, \'' + escapar(p.foto) + '\')">' +
-            '<img class="miniatura" src="' + escapar(p.foto2) + '" alt="Vista 2" onclick="cambiarFoto(this, \'' + escapar(p.foto2) + '\')">' +
-            '</div>';
-        }}
-      }} else {{
-        foto = '<div class="modal-foto-vacia">M</div>';
+    function bloqueVisual(p) {{
+      if (!p.foto) {{
+        return '<div class="modal-visual"><div class="modal-foto-vacia">M</div></div>';
       }}
 
-      var detalles = "";
+      var html = '<div class="modal-visual">';
+      html += '<div class="modal-foto">';
+      html += '<img id="fotoGrande" src="' + escapar(p.foto) + '" alt="' + escapar(p.nombre) + '" onerror="this.parentNode.outerHTML=\'<div class=modal-foto-vacia>M</div>\'">';
+      html += '</div>';
+
+      if (p.foto2) {{
+        html += '<div class="modal-miniaturas">';
+        html += '<img class="miniatura activa" src="' + escapar(p.foto) + '" alt="Vista 1" onclick="cambiarFoto(this, \'' + escapar(p.foto) + '\')">';
+        html += '<img class="miniatura" src="' + escapar(p.foto2) + '" alt="Vista 2" onclick="cambiarFoto(this, \'' + escapar(p.foto2) + '\')">';
+        html += '</div>';
+      }}
+
+      html += '</div>';
+      return html;
+    }}
+
+    function bloqueDetalles(p) {{
+      var filas = "";
+
       if (p.material) {{
-        detalles += '<div class="modal-detalle-item"><b>Material</b><span>' + escapar(p.material) + '</span></div>';
+        filas += '<div class="modal-detalle-item"><b>Material</b><span>' + escapar(p.material) + '</span></div>';
       }}
       if (p.talla) {{
-        detalles += '<div class="modal-detalle-item"><b>Talla</b><span>' + escapar(p.talla) + '</span></div>';
+        filas += '<div class="modal-detalle-item"><b>Medida</b><span>' + escapar(p.talla) + '</span></div>';
       }}
       if (p.categoria) {{
-        detalles += '<div class="modal-detalle-item"><b>Categoría</b><span>' + escapar(p.categoria) + '</span></div>';
+        filas += '<div class="modal-detalle-item"><b>Categoría</b><span>' + escapar(p.categoria) + '</span></div>';
       }}
 
-      var descripcion = p.descripcion
-        ? '<p class="modal-descripcion">' + escapar(p.descripcion) + '</p>'
-        : '';
+      if (!filas) {{
+        return "";
+      }}
+      return '<div class="modal-detalles">' + filas + '</div>';
+    }}
 
-      modalContenido.innerHTML =
-        foto +
-        '<div class="modal-info">' +
-          '<h2 class="modal-nombre">' + escapar(p.nombre) + '</h2>' +
-          '<div class="modal-precio">' + escapar(p.precio) + '</div>' +
-          (detalles ? '<div class="modal-detalles">' + detalles + '</div>' : '') +
-          descripcion +
-          '<a href="' + urlWhatsApp(p) + '" target="_blank" rel="noopener" class="modal-btn-wa" id="btnWhatsApp">' +
-            ICONO_WA + '<span>Consultar por WhatsApp</span>' +
-          '</a>' +
-        '</div>';
+    function abrirModal(p) {{
+      var descripcion = "";
+      if (p.descripcion) {{
+        descripcion = '<p class="modal-descripcion">' + escapar(p.descripcion) + '</p>';
+      }}
+
+      var info = '<div class="modal-info">';
+      info += '<div class="modal-encabezado">';
+      info += '<h2 class="modal-nombre">' + escapar(p.nombre) + '</h2>';
+      info += '<div class="modal-precio">' + escapar(p.precio) + '</div>';
+      info += '</div>';
+      info += descripcion;
+      info += bloqueDetalles(p);
+      info += '<a href="' + urlWhatsApp(p) + '" target="_blank" rel="noopener" class="modal-btn-wa" id="btnWhatsApp">';
+      info += ICONO_WA + '<span>Consultar disponibilidad</span>';
+      info += '</a>';
+      info += '<p class="modal-nota">Envío el mismo día · Entrega en mano en Asunción</p>';
+      info += '</div>';
+
+      modalContenido.innerHTML = bloqueVisual(p) + info;
 
       modal.classList.add("abierto");
       document.body.classList.add("modal-abierto");
+      modalCaja.scrollTop = 0;
 
       var btnWa = document.getElementById("btnWhatsApp");
       if (btnWa) {{
