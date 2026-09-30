@@ -842,6 +842,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       --borde: #241d24; --borde-luz: #3a2d38;
       --hueso: #e7e0e4; --hueso-tenue: #a99ea6; --ceniza: #6f6570;
       --vino: #7c3a4e; --vino-1: #8a3a50; --vino-2: #b06074;
+      --acido: #9dbf1a; --acido-luz: #b8d92e;
     }}
     html {{ background: var(--negro); scrollbar-color: #2a2029 var(--negro); scroll-behavior: smooth; }}
     body {{
@@ -905,6 +906,45 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     }}
     .filtro-btn:hover {{ border-color: var(--vino-1); color: var(--hueso); }}
     .filtro-btn.activo {{ background: var(--vino); border-color: var(--vino); color: var(--hueso); }}
+
+    .filtro-btn.destacado {{
+      border-color: var(--acido);
+      animation: pulso-taller 2.6s ease-in-out infinite;
+    }}
+    .filtro-btn.destacado:hover {{ border-color: var(--acido-luz); color: var(--hueso); }}
+    .filtro-btn.destacado.activo {{
+      animation: none;
+      background: var(--vino); border-color: var(--vino); color: var(--hueso);
+    }}
+    @keyframes pulso-taller {{
+      0% {{ box-shadow: 0 0 0 0 rgba(157, 191, 26, 0.45), 0 0 6px 0 rgba(157, 191, 26, 0.25); }}
+      55% {{ box-shadow: 0 0 0 5px rgba(157, 191, 26, 0), 0 0 16px 2px rgba(157, 191, 26, 0.45); }}
+      100% {{ box-shadow: 0 0 0 0 rgba(157, 191, 26, 0), 0 0 6px 0 rgba(157, 191, 26, 0.25); }}
+    }}
+    @media (prefers-reduced-motion: reduce) {{
+      .filtro-btn.destacado {{ animation: none; box-shadow: 0 0 10px 1px rgba(157, 191, 26, 0.35); }}
+    }}
+
+    .aviso-taller {{
+      display: none;
+      max-width: 620px; margin: 0 auto 2rem;
+      padding: 1.1rem 1.25rem;
+      background: var(--panel);
+      border: 1px solid var(--borde);
+      border-left: 2px solid var(--acido);
+    }}
+    .aviso-taller.visible {{ display: block; }}
+    .aviso-taller h3 {{
+      font-family: "Cinzel", serif; font-weight: 500;
+      font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--acido-luz); margin-bottom: 0.6rem;
+    }}
+    .aviso-taller p {{
+      color: var(--hueso-tenue); font-size: 0.84rem;
+      line-height: 1.7; margin-bottom: 0.6rem;
+    }}
+    .aviso-taller p:last-child {{ margin-bottom: 0; }}
+    .aviso-taller b {{ color: var(--hueso); font-weight: 500; }}
     .contador {{
       text-align: center; color: var(--ceniza); font-size: 0.72rem;
       letter-spacing: 0.22em; text-transform: uppercase; margin-bottom: 2.2rem;
@@ -1172,6 +1212,24 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       <input type="text" id="buscar" placeholder="Buscar pieza o material" autocomplete="off">
     </div>
     <div class="filtros" id="filtros"></div>
+
+    <div class="aviso-taller" id="avisoTaller">
+      <h3>Piezas de taller</h3>
+      <p>
+        Todo lo que sale del taller es <b>cuero cortado y cosido a mano</b>, una
+        pieza por vez. No hay dos iguales, ni siquiera cuando lo intentamos.
+      </p>
+      <p>
+        Se puede <b>personalizar</b>: medidas, color del cuero, herrajes, tachas,
+        iniciales o un diseño tuyo. Contanos qué tenés en la cabeza y te decimos
+        si se puede — casi siempre se puede.
+      </p>
+      <p>
+        Para entrar al taller pedimos una <b>seña del 50%</b>. El resto se abona
+        contra entrega.
+      </p>
+    </div>
+
     <div class="contador" id="contador"></div>
     <div class="grilla" id="grilla"></div>
     <div class="vacio" id="vacio" style="display:none;">No se encontraron piezas.</div>
@@ -1221,10 +1279,13 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       </details>
 
       <details class="faq-item">
-        <summary>¿Hacen piezas a pedido?</summary>
+        <summary>¿Qué son las piezas de taller?</summary>
         <div class="faq-respuesta">
-          Sí, en cuero. Los pedidos entran al taller con una
-          <b>seña del 50%</b>. Escribinos y lo conversamos.
+          Billeteras, bandoleras, mochilas y todo lo de cuero lo hacemos
+          nosotros, a mano, una pieza por vez. Son <b>únicas</b>: no hay dos
+          iguales. Podés pedirlas <b>personalizadas</b> en medidas, color de
+          cuero, herrajes, tachas o iniciales. Para que entre al taller pedimos
+          una <b>seña del 50%</b> y el resto se abona contra entrega.
         </div>
       </details>
 
@@ -1284,6 +1345,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     var grilla = document.getElementById("grilla");
     var vacio = document.getElementById("vacio");
     var contador = document.getElementById("contador");
+    var avisoTaller = document.getElementById("avisoTaller");
     var inputBuscar = document.getElementById("buscar");
     var filtrosEl = document.getElementById("filtros");
     var modal = document.getElementById("modal");
@@ -1443,7 +1505,7 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     }}
 
     function construirFiltros() {{
-      var ORDEN = ["Anillos", "Aros", "Billeteras", "Cadenas", "Chokers", "Collares", "Conjuntos", "Dijes", "Llaveros", "Muñequeras", "Pendientes", "Pines", "Pulseras", "Soportes", "Otros"];
+      var ORDEN = ["Taller", "Anillos", "Aros", "Cadenas", "Chokers", "Collares", "Conjuntos", "Dijes", "Llaveros", "Muñequeras", "Pendientes", "Pines", "Pulseras", "Soportes", "Otros"];
       var presentes = {{}};
       PRODUCTOS.forEach(function (p) {{ presentes[p.categoria || "Otros"] = true; }});
       var lista = ["Todos"];
@@ -1455,7 +1517,13 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
       lista.forEach(function (cat) {{
         var btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "filtro-btn" + (cat === categoriaActiva ? " activo" : "");
+        btn.className = "filtro-btn";
+        if (cat === "Taller") {{
+          btn.className += " destacado";
+        }}
+        if (cat === categoriaActiva) {{
+          btn.className += " activo";
+        }}
         btn.textContent = cat;
         btn.addEventListener("click", function () {{
           categoriaActiva = cat;
@@ -1467,6 +1535,12 @@ PLANTILLA_HTML = r"""<!DOCTYPE html>
     }}
 
     function aplicarFiltros() {{
+      if (categoriaActiva === "Taller") {{
+        avisoTaller.classList.add("visible");
+      }} else {{
+        avisoTaller.classList.remove("visible");
+      }}
+
       var q = normalizar(inputBuscar.value);
       var filtrados = PRODUCTOS.filter(function (p) {{
         var coincideCat = categoriaActiva === "Todos" || (p.categoria || "Otros") === categoriaActiva;
